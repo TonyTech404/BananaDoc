@@ -52,7 +52,7 @@ def main():
     """Main function"""
     parser = argparse.ArgumentParser(description='Run the BananaDoc AI API server')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to bind to')
-    parser.add_argument('--port', type=int, default=5000, help='Port to bind to')
+    parser.add_argument('--port', type=int, default=5002, help='Port to bind to')
     parser.add_argument('--skip-checks', action='store_true', help='Skip model file checks')
     
     args = parser.parse_args()

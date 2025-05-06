@@ -3,6 +3,7 @@ import sys
 import base64
 from io import BytesIO
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # Add parent directory to path so we can import our modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +13,7 @@ from utils.model_loader import ModelLoader
 from utils.deficiency_info import DeficiencyInfoProvider
 
 app = Flask(__name__)
+CORS(app)
 
 # Initialize model loader
 model_loader = ModelLoader(model_dir='../model')
@@ -88,5 +90,5 @@ if __name__ == '__main__':
         print("Warning: No model loaded. Server will start but predictions will fail.")
     
     # Start the Flask server
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5002))
     app.run(host='0.0.0.0', port=port) 

@@ -13,33 +13,120 @@ class AppLocalizations {
     'en': {
       'appTitle': 'BananaDoc',
       'consultant': 'BananaDoc Consultant',
-      'welcomeMessage': 'Ask me any questions about banana leaf deficiencies and diseases. I\'m here to help!',
+      'welcomeMessage':
+          'Ask me any questions about banana leaf deficiencies and diseases. I\'m here to help!',
       'messageHint': 'Describe leaf condition or ask a question...',
       'send': 'Send',
       'treatment': 'Treatment:',
       'prevention': 'Prevention:',
       'errorMessage': 'Sorry, I encountered an error. Please try again.',
+      'detect': 'Detect',
+      'chat': 'Chat',
+      'camera': 'Camera',
+      'gallery': 'Gallery',
+      'analyzing': 'Analyzing leaf...',
+      'selectImage': 'Select a banana leaf image',
+      'deficiencyDetection': 'Nutrient Deficiency Detection',
+      'serverNotAvailable':
+          'AI model server not available. Make sure Python server is running.',
+      'refresh': 'Refresh',
+      'takePhoto': 'Take Photo',
+      'uploadImage': 'Upload Image',
+      'analysisComplete': 'Leaf Analysis Complete',
+      'diagnosis': 'Diagnosis',
+      'recommendedTreatment': 'Recommended Treatment',
+      'preventionTips': 'Prevention Tips',
+      'continueToChatAssistant': 'Continue to Chat Assistant',
+      'newAnalysis': 'New Analysis',
+      'welcomeToBananaDoc': 'Welcome to BananaDoc',
+      'selectLanguage': 'Please select your preferred language',
+      'english': 'English',
+      'filipino': 'Filipino (Tagalog)',
+      'clearChatHistory': 'Clear Chat History',
     },
     'tl': {
       'appTitle': 'BananaDoc',
       'consultant': 'BananaDoc Consultant',
-      'welcomeMessage': 'Magtanong tungkol sa mga kakulangan at sakit ng dahon ng saging. Handa akong tumulong!',
+      'welcomeMessage':
+          'Magtanong tungkol sa mga kakulangan at sakit ng dahon ng saging. Handa akong tumulong!',
       'messageHint': 'Ilarawan ang kondisyon ng dahon o magtanong...',
       'send': 'Ipadala',
       'treatment': 'Paggamot:',
       'prevention': 'Pag-iwas:',
       'errorMessage': 'Paumanhin, may naganap na error. Subukan muli.',
+      'detect': 'Suriin',
+      'chat': 'Usapan',
+      'camera': 'Kamera',
+      'gallery': 'Galeri',
+      'analyzing': 'Sinusuri ang dahon...',
+      'selectImage': 'Pumili ng larawan ng dahon ng saging',
+      'deficiencyDetection': 'Pagsusuri ng Kakulangan sa Sustansya',
+      'serverNotAvailable':
+          'Hindi available ang AI model server. Siguraduhing tumatakbo ang Python server.',
+      'refresh': 'I-refresh',
+      'takePhoto': 'Kumuha ng Larawan',
+      'uploadImage': 'Mag-upload ng Larawan',
+      'analysisComplete': 'Kompleto na ang Pagsusuri ng Dahon',
+      'diagnosis': 'Diagnosis',
+      'recommendedTreatment': 'Inirerekumendang Paggamot',
+      'preventionTips': 'Mga Tip sa Pag-iwas',
+      'continueToChatAssistant': 'Magpatuloy sa Chat Assistant',
+      'newAnalysis': 'Bagong Pagsusuri',
+      'welcomeToBananaDoc': 'Maligayang Pagdating sa BananaDoc',
+      'selectLanguage': 'Piliin ang iyong gustong wika',
+      'english': 'Ingles',
+      'filipino': 'Filipino (Tagalog)',
+      'clearChatHistory': 'Burahin ang Kasaysayan ng Chat',
     },
   };
 
   String get appTitle => _localizedValues[locale.languageCode]!['appTitle']!;
-  String get consultant => _localizedValues[locale.languageCode]!['consultant']!;
-  String get welcomeMessage => _localizedValues[locale.languageCode]!['welcomeMessage']!;
-  String get messageHint => _localizedValues[locale.languageCode]!['messageHint']!;
+  String get consultant =>
+      _localizedValues[locale.languageCode]!['consultant']!;
+  String get welcomeMessage =>
+      _localizedValues[locale.languageCode]!['welcomeMessage']!;
+  String get messageHint =>
+      _localizedValues[locale.languageCode]!['messageHint']!;
   String get send => _localizedValues[locale.languageCode]!['send']!;
   String get treatment => _localizedValues[locale.languageCode]!['treatment']!;
-  String get prevention => _localizedValues[locale.languageCode]!['prevention']!;
-  String get errorMessage => _localizedValues[locale.languageCode]!['errorMessage']!;
+  String get prevention =>
+      _localizedValues[locale.languageCode]!['prevention']!;
+  String get errorMessage =>
+      _localizedValues[locale.languageCode]!['errorMessage']!;
+  String get detect => _localizedValues[locale.languageCode]!['detect']!;
+  String get chat => _localizedValues[locale.languageCode]!['chat']!;
+  String get camera => _localizedValues[locale.languageCode]!['camera']!;
+  String get gallery => _localizedValues[locale.languageCode]!['gallery']!;
+  String get analyzing => _localizedValues[locale.languageCode]!['analyzing']!;
+  String get selectImage =>
+      _localizedValues[locale.languageCode]!['selectImage']!;
+  String get deficiencyDetection =>
+      _localizedValues[locale.languageCode]!['deficiencyDetection']!;
+  String get serverNotAvailable =>
+      _localizedValues[locale.languageCode]!['serverNotAvailable']!;
+  String get refresh => _localizedValues[locale.languageCode]!['refresh']!;
+  String get takePhoto => _localizedValues[locale.languageCode]!['takePhoto']!;
+  String get uploadImage =>
+      _localizedValues[locale.languageCode]!['uploadImage']!;
+  String get analysisComplete =>
+      _localizedValues[locale.languageCode]!['analysisComplete']!;
+  String get diagnosis => _localizedValues[locale.languageCode]!['diagnosis']!;
+  String get recommendedTreatment =>
+      _localizedValues[locale.languageCode]!['recommendedTreatment']!;
+  String get preventionTips =>
+      _localizedValues[locale.languageCode]!['preventionTips']!;
+  String get continueToChatAssistant =>
+      _localizedValues[locale.languageCode]!['continueToChatAssistant']!;
+  String get newAnalysis =>
+      _localizedValues[locale.languageCode]!['newAnalysis']!;
+  String get welcomeToBananaDoc =>
+      _localizedValues[locale.languageCode]!['welcomeToBananaDoc']!;
+  String get selectLanguage =>
+      _localizedValues[locale.languageCode]!['selectLanguage']!;
+  String get english => _localizedValues[locale.languageCode]!['english']!;
+  String get filipino => _localizedValues[locale.languageCode]!['filipino']!;
+  String get clearChatHistory =>
+      _localizedValues[locale.languageCode]!['clearChatHistory']!;
 }
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
@@ -57,4 +144,4 @@ class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
 
   @override
   bool shouldReload(AppLocalizationsDelegate old) => false;
-} 
+}

@@ -10,7 +10,14 @@ class ModelLoader:
         Args:
             model_dir: Directory where model files are stored
         """
-        self.model_dir = model_dir
+        # Convert to absolute path if relative
+        if not os.path.isabs(model_dir):
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            self.model_dir = os.path.abspath(os.path.join(current_dir, model_dir))
+        else:
+            self.model_dir = model_dir
+            
+        print(f"Using model directory: {self.model_dir}")
         self.model = None
         self.interpreter = None
         self.input_details = None

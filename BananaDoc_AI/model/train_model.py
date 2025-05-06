@@ -80,7 +80,7 @@ class BananaLeafDeficiencyModelTrainer:
         print(f"Classes: {self.class_names}")
         
         # Save class mapping to a file
-        with open('class_mapping.txt', 'w') as f:
+        with open(os.path.join(os.path.dirname(__file__), 'class_mapping.txt'), 'w') as f:
             for class_name, idx in self.class_indices.items():
                 f.write(f"{idx}: {class_name}\n")
         
@@ -128,7 +128,7 @@ class BananaLeafDeficiencyModelTrainer:
         
         # Callbacks
         checkpoint = ModelCheckpoint(
-            'banana_nutrient_model.h5',
+            os.path.join(os.path.dirname(__file__), 'banana_nutrient_model.h5'),
             monitor='val_accuracy',
             save_best_only=True,
             mode='max',
@@ -162,7 +162,7 @@ class BananaLeafDeficiencyModelTrainer:
         tflite_model = converter.convert()
         
         # Save the TFLite model
-        with open('banana_nutrient_model.tflite', 'wb') as f:
+        with open(os.path.join(os.path.dirname(__file__), 'banana_nutrient_model.tflite'), 'wb') as f:
             f.write(tflite_model)
         print("TensorFlow Lite model saved.")
     
@@ -192,7 +192,7 @@ class BananaLeafDeficiencyModelTrainer:
         plt.legend(['Train', 'Validation'], loc='upper left')
         
         # Save the plot
-        plt.savefig('training_history.png')
+        plt.savefig(os.path.join(os.path.dirname(__file__), 'training_history.png'))
         plt.close()
         print("Training history plot saved.")
     

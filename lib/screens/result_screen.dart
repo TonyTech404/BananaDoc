@@ -1,19 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/leaf_analysis_result.dart';
 import '../widgets/custom_button.dart';
+import '../models/chat_message.dart';
+import '../services/chat_history_service.dart';
+import '../services/llm_service.dart';
+import '../services/nutrient_deficiency_service.dart';
+import '../main.dart';
+import '../localization/app_localizations.dart';
+import '../providers/locale_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ResultScreen extends StatelessWidget {
   final LeafAnalysisResult result;
+  final LLMService _llmService = LLMService();
+  final NutrientDeficiencyService _deficiencyService =
+      NutrientDeficiencyService();
 
-  const ResultScreen({super.key, required this.result});
+  ResultScreen({super.key, required this.result});
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
+    // Update LLMService with current locale
+    _llmService.currentLocale = localeProvider.locale;
+
+    // Update NutrientDeficiencyService with current locale
+    _deficiencyService.currentLocale = localeProvider.locale;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Analysis Results'),
+        title: Text(localizations.analysisComplete),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'en') {
+                localeProvider.setLocale(const Locale('en', ''));
+                // Update language preference
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('selected_language', 'en');
+                // Update LLMService locale
+                _llmService.currentLocale = const Locale('en', '');
+              } else if (value == 'tl') {
+                localeProvider.setLocale(const Locale('tl', ''));
+                // Update language preference
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('selected_language', 'tl');
+                // Update LLMService locale
+                _llmService.currentLocale = const Locale('tl', '');
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'en',
+                child: Row(
+                  children: [
+                    if (localeProvider.locale.languageCode == 'en')
+                      const Icon(Icons.check, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(localizations.english),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'tl',
+                child: Row(
+                  children: [
+                    if (localeProvider.locale.languageCode == 'tl')
+                      const Icon(Icons.check, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(localizations.filipino),
+                  ],
+                ),
+              ),
+            ],
+            icon: const Icon(Icons.language),
+            tooltip: localizations.selectLanguage,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -27,9 +95,9 @@ class ResultScreen extends StatelessWidget {
               color: Color(0xFF4CAF50),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Leaf Analysis Complete',
-              style: TextStyle(
+            Text(
+              localizations.analysisComplete,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
@@ -37,28 +105,119 @@ class ResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             _buildResultSection(
-              title: 'Diagnosis',
+              title: localizations.diagnosis,
               content: result.diagnosis,
               icon: Icons.medical_information,
               color: const Color(0xFF4CAF50),
             ),
             const SizedBox(height: 16),
             _buildResultSection(
-              title: 'Recommended Treatment',
+              title: localizations.recommendedTreatment,
               content: result.treatment,
               icon: Icons.healing,
               color: const Color(0xFF2196F3),
             ),
             const SizedBox(height: 16),
             _buildResultSection(
-              title: 'Prevention Tips',
+              title: localizations.preventionTips,
               content: result.prevention,
               icon: Icons.shield,
               color: const Color(0xFFFF9800),
             ),
             const SizedBox(height: 24),
             CustomButton(
-              text: 'New Analysis',
+              text: localizations.continueToChatAssistant,
+              onPressed: () async {
+                final chatService =
+                    Provider.of<ChatHistoryService>(context, listen: false);
+
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  },
+                );
+
+                // Clear any existing chat and set the current deficiency
+                chatService.clearMessages();
+                chatService.setDeficiency(result.deficiencyType);
+
+                // Add initial message from assistant
+                final welcomeMessage = ChatMessage(
+                  text:
+                      'I can help answer your questions about ${result.deficiencyType} deficiency in your banana plants. What would you like to know?',
+                  isUser: false,
+                );
+                chatService.addMessage(welcomeMessage);
+
+                try {
+                  // Get explanation from LLM
+                  final explanation =
+                      await _llmService.getDeficiencyExplanation(
+                          result.deficiencyType, result.confidence);
+
+                  // Add explanation message
+                  final explanationMessage = ChatMessage(
+                    text: explanation,
+                    isUser: false,
+                  );
+                  chatService.addMessage(explanationMessage);
+
+                  // Get treatment recommendation
+                  final treatment = await _llmService
+                      .getTreatmentRecommendation(result.deficiencyType);
+
+                  // Add treatment message
+                  final treatmentMessage = ChatMessage(
+                    text: treatment,
+                    isUser: false,
+                  );
+                  chatService.addMessage(treatmentMessage);
+                } catch (e) {
+                  // If there's an error, at least add a basic message
+                  final errorMessage = ChatMessage(
+                    text:
+                        'I detected a ${result.deficiencyType} deficiency in your banana plant. I can answer questions about this condition.',
+                    isUser: false,
+                  );
+                  chatService.addMessage(errorMessage);
+                }
+
+                // Close loading dialog
+                Navigator.of(context).pop();
+
+                // Navigate back to main screen and select the chat tab
+                Navigator.of(context).popUntil((route) => route.isFirst);
+
+                // Wait a moment to ensure we're back at the main screen
+                Future.microtask(() {
+                  // Find and use the MainNavigationScreenState to switch tabs
+                  // This approach avoids GlobalKey issues
+                  final navigatorState = Navigator.of(context);
+                  navigatorState.pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) {
+                        final mainScreen = const MainNavigationScreen();
+                        Future.microtask(() {
+                          // Use the static method to navigate to chat tab
+                          MainNavigationScreenState.navigateToChatTab();
+                        });
+                        return mainScreen;
+                      },
+                    ),
+                  );
+                });
+              },
+              icon: Icons.chat,
+              color: Colors.purple,
+            ),
+            const SizedBox(height: 16),
+            CustomButton(
+              text: localizations.newAnalysis,
               onPressed: () => Navigator.pop(context),
               icon: Icons.refresh,
             ),
@@ -109,4 +268,4 @@ class ResultScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}

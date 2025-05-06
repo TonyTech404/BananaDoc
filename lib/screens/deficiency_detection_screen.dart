@@ -1,9 +1,17 @@
 import 'dart:io';
+import 'dart:html' as html;
+import 'dart:typed_data';
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../services/nutrient_deficiency_service.dart';
 import '../models/leaf_analysis_result.dart';
 import 'result_screen.dart';
+import '../localization/app_localizations.dart';
+import '../providers/locale_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DeficiencyDetectionScreen extends StatefulWidget {
   const DeficiencyDetectionScreen({Key? key}) : super(key: key);
@@ -16,7 +24,8 @@ class DeficiencyDetectionScreen extends StatefulWidget {
 class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
   final NutrientDeficiencyService _deficiencyService =
       NutrientDeficiencyService();
-  File? _selectedImage;
+  File? _selectedImageFile;
+  Uint8List? _selectedImageBytes;
   bool _isLoading = false;
   bool _isApiAvailable = false;
   String _errorMessage = '';
@@ -25,6 +34,13 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
   void initState() {
     super.initState();
     _checkApiStatus();
+
+    // Set initial locale
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final localeProvider =
+          Provider.of<LocaleProvider>(context, listen: false);
+      _deficiencyService.currentLocale = localeProvider.locale;
+    });
   }
 
   Future<void> _checkApiStatus() async {
@@ -34,7 +50,7 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
         _isApiAvailable = isAvailable;
         if (!isAvailable) {
           _errorMessage =
-              'The AI model server is not available. Make sure it\'s running at localhost:5000';
+              'The AI model server is not available. Make sure it\'s running at ${NutrientDeficiencyService.baseUrl}';
         }
       });
     } catch (e) {
@@ -47,10 +63,16 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final image = await _deficiencyService.pickImage(source: source);
-      if (image != null) {
+      final pickedImage = await _deficiencyService.pickImage(source: source);
+      if (pickedImage != null) {
         setState(() {
-          _selectedImage = image;
+          if (kIsWeb) {
+            _selectedImageBytes = pickedImage;
+            _selectedImageFile = null;
+          } else {
+            _selectedImageFile = pickedImage as File;
+            _selectedImageBytes = null;
+          }
           _errorMessage = '';
         });
       }
@@ -62,7 +84,11 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
   }
 
   Future<void> _analyzeImage() async {
-    if (_selectedImage == null) {
+    final localizations = AppLocalizations.of(context);
+
+    if ((_selectedImageFile == null && _selectedImageBytes == null) ||
+        (kIsWeb && _selectedImageBytes == null) ||
+        (!kIsWeb && _selectedImageFile == null)) {
       setState(() {
         _errorMessage = 'Please select an image first';
       });
@@ -71,8 +97,7 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
 
     if (!_isApiAvailable) {
       setState(() {
-        _errorMessage =
-            'The AI model server is not available. Make sure it\'s running at localhost:5000';
+        _errorMessage = localizations.serverNotAvailable;
       });
       return;
     }
@@ -83,7 +108,9 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
     });
 
     try {
-      final result = await _deficiencyService.analyzeImage(_selectedImage!);
+      final result = kIsWeb
+          ? await _deficiencyService.analyzeImageWeb(_selectedImageBytes!)
+          : await _deficiencyService.analyzeImage(_selectedImageFile!);
 
       if (mounted) {
         setState(() {
@@ -110,9 +137,15 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
+    // Update the NutrientDeficiencyService locale when it changes
+    _deficiencyService.currentLocale = localeProvider.locale;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nutrient Deficiency Detection'),
+        title: Text(localizations.deficiencyDetection),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
@@ -135,13 +168,14 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'AI model server not available. Make sure Python server is running.',
+                        localizations.serverNotAvailable,
                         style: TextStyle(color: Colors.red.shade700),
                       ),
                     ),
                     IconButton(
                       icon: Icon(Icons.refresh, color: Colors.red.shade700),
                       onPressed: _checkApiStatus,
+                      tooltip: localizations.refresh,
                     ),
                   ],
                 ),
@@ -157,14 +191,10 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade300),
               ),
-              child: _selectedImage != null
+              child: _hasSelectedImage()
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        _selectedImage!,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                      ),
+                      child: _displaySelectedImage(),
                     )
                   : Center(
                       child: Column(
@@ -177,7 +207,7 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Select a banana leaf image',
+                            localizations.selectImage,
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey.shade600,
@@ -188,54 +218,73 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
                     ),
             ),
 
-            const SizedBox(height: 24),
+            // Error message
+            if (_errorMessage.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16.0),
+                child: Text(
+                  _errorMessage,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
 
-            // Image selection buttons
+            const SizedBox(height: 20),
+
+            // Image source buttons
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                ElevatedButton.icon(
-                  onPressed: () => _pickImage(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Camera'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt),
+                    label: Text(localizations.takePhoto),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ),
-                ElevatedButton.icon(
-                  onPressed: () => _pickImage(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Gallery'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library),
+                    label: Text(localizations.uploadImage),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                      foregroundColor: Colors.black87,
+                    ),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Analyze button
             ElevatedButton(
-              onPressed:
-                  _isLoading || _selectedImage == null ? null : _analyzeImage,
+              onPressed: _isLoading ? null : _analyzeImage,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: const Color(0xFF4CAF50),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                disabledBackgroundColor: Colors.grey.shade300,
+                disabledBackgroundColor: Colors.grey,
               ),
               child: _isLoading
-                  ? const Row(
+                  ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(
+                        const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
@@ -243,33 +292,40 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
                             strokeWidth: 3,
                           ),
                         ),
-                        SizedBox(width: 10),
-                        Text('Analyzing...'),
+                        const SizedBox(width: 10),
+                        Text(localizations.analyzing),
                       ],
                     )
                   : const Text(
                       'Analyze Leaf',
-                      style: TextStyle(fontSize: 16),
+                      style: TextStyle(fontSize: 18),
                     ),
             ),
-
-            // Error message
-            if (_errorMessage.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(top: 20),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _errorMessage,
-                  style: TextStyle(color: Colors.red.shade800),
-                ),
-              ),
           ],
         ),
       ),
     );
+  }
+
+  bool _hasSelectedImage() {
+    return (kIsWeb && _selectedImageBytes != null) ||
+        (!kIsWeb && _selectedImageFile != null);
+  }
+
+  Widget _displaySelectedImage() {
+    if (kIsWeb && _selectedImageBytes != null) {
+      return Image.memory(
+        _selectedImageBytes!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+      );
+    } else if (!kIsWeb && _selectedImageFile != null) {
+      return Image.file(
+        _selectedImageFile!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+      );
+    }
+    return Container(); // Fallback
   }
 }

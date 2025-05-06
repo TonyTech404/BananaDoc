@@ -11,7 +11,8 @@ from utils.model_loader import ModelLoader
 from utils.deficiency_info import DeficiencyInfoProvider
 
 # Initialize model loader and deficiency info provider
-model_loader = ModelLoader()
+model_dir = os.path.abspath(os.path.dirname(__file__))  # Use absolute path
+model_loader = ModelLoader(model_dir=model_dir)
 deficiency_info_provider = DeficiencyInfoProvider()
 
 def test_on_image(img_path):

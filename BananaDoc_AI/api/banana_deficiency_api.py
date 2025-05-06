@@ -19,6 +19,11 @@ CORS(app)
 model_loader = ModelLoader(model_dir='../model')
 deficiency_info_provider = DeficiencyInfoProvider()
 
+@app.route('/')
+def index():
+    """Default route to confirm server is running."""
+    return jsonify({"message": "Banana Deficiency Detection API is running."})
+
 @app.route('/predict', methods=['POST'])
 def predict_api():
     if not request.json or 'image' not in request.json:

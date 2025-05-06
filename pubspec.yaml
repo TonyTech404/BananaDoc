@@ -1,0 +1,31 @@
+name: bananadoc
+description: AI-Powered Banana Leaf Deficiency App
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=2.19.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  http: ^1.1.0
+  image_picker: ^1.0.4
+  provider: ^6.0.5
+  google_fonts: ^5.1.0
+  flutter_svg: ^2.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/ 

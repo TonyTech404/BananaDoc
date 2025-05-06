@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+
+# TensorFlow model files
+*.h5
+*.tflite
+*.pb
+*.ckpt.*
+*.ckpt
+checkpoint
+
+# Training outputs
+training_history.png
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Datasets
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tif
+*.tiff
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+ENV/
+.DS_Store
+
+# Docker
+.dockerignore 

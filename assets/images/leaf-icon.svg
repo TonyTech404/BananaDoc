@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200px" height="200px" viewBox="0 0 200 200" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <title>Banana Leaf</title>
+    <g stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M100,20 C60,20 20,60 20,100 C20,140 60,180 100,180 C140,180 180,140 180,100 C180,60 140,20 100,20 Z" fill="#E8F5E9"/>
+        <path d="M100,35 C65,35 35,65 35,100 C35,135 65,165 100,165 C135,165 165,135 165,100 C165,65 135,35 100,35 Z M100,40 C132.5,40 160,67.5 160,100 C160,132.5 132.5,160 100,160 C67.5,160 40,132.5 40,100 C40,67.5 67.5,40 100,40 Z" fill="#4CAF50"/>
+        <path d="M100,50 C75,50 55,70 55,95 C55,120 75,140 100,140 C125,140 145,120 145,95 C145,70 125,50 100,50 Z" fill="#81C784"/>
+        <path d="M100,140 L100,180" stroke="#4CAF50" stroke-width="6" stroke-linecap="round"/>
+        <path d="M70,95 C75,85 85,80 100,80 C115,80 125,85 130,95" stroke="#388E3C" stroke-width="3" stroke-linecap="round"/>
+        <path d="M80,115 C85,105 95,100 100,100 C105,100 115,105 120,115" stroke="#388E3C" stroke-width="3" stroke-linecap="round"/>
+    </g>
+</svg> 

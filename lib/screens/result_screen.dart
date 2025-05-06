@@ -201,7 +201,7 @@ class ResultScreen extends StatelessWidget {
                   navigatorState.pushReplacement(
                     MaterialPageRoute(
                       builder: (context) {
-                        final mainScreen = const MainNavigationScreen();
+                        const mainScreen = MainNavigationScreen();
                         Future.microtask(() {
                           // Use the static method to navigate to chat tab
                           MainNavigationScreenState.navigateToChatTab();

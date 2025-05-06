@@ -1,17 +1,13 @@
 import 'dart:io';
-import 'dart:html' as html;
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../services/nutrient_deficiency_service.dart';
-import '../models/leaf_analysis_result.dart';
 import 'result_screen.dart';
 import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class DeficiencyDetectionScreen extends StatefulWidget {
   const DeficiencyDetectionScreen({Key? key}) : super(key: key);

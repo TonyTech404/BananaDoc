@@ -174,11 +174,11 @@ class NutrientDeficiencyService {
 
     if (isFilipino) {
       return 'Ang dahon ng saging na ito ay nagpapakita ng palatandaan ng kakulangan sa $deficiency '
-          '(${confidencePercent}% kumpiyansa).\n\n'
+          '($confidencePercent% kumpiyansa).\n\n'
           'Mga sintomas: $symptoms';
     } else {
       return 'This banana leaf shows signs of $deficiency deficiency '
-          '(${confidencePercent}% confidence).\n\n'
+          '($confidencePercent% confidence).\n\n'
           'Symptoms: $symptoms';
     }
   }

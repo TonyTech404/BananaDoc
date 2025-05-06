@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
@@ -95,14 +93,14 @@ class LLMService {
         prompt = "Conversation history:\n$context\n\n"
             "The farmer's banana plant has $deficiencyType deficiency. "
             "Question: $question\n\n"
-            "${isTagalog ? 'Respond in Tagalog/Filipino language using professional but accessible language. Avoid overly casual language like \"naku pare\".' : 'Respond in English.'}\n"
+            "${isTagalog ? 'Respond in Tagalog/Filipino language using professional but accessible language. Avoid overly casual language like "naku pare".' : 'Respond in English.'}\n"
             "Important: Always acknowledge and reference the $deficiencyType deficiency that was already detected. "
             "Don't ask for symptoms again if they were already provided. "
             "Focus specifically on practical $deficiencyType deficiency treatment and management.";
       } else {
         prompt = "The farmer's banana plant has $deficiencyType deficiency. "
             "Question: $question\n\n"
-            "${isTagalog ? 'Respond in Tagalog/Filipino language using professional but accessible language. Avoid overly casual language like \"naku pare\".' : 'Respond in English.'}\n"
+            "${isTagalog ? 'Respond in Tagalog/Filipino language using professional but accessible language. Avoid overly casual language like "naku pare".' : 'Respond in English.'}\n"
             "Important: Always acknowledge the $deficiencyType deficiency that was already detected. "
             "Focus specifically on practical $deficiencyType deficiency treatment and management.";
       }
@@ -523,7 +521,7 @@ class LLMService {
 
   // Simulated responses for prototype
   String _generateDeficiencyExplanation(String deficiency, double confidence) {
-    final String confidenceStr = '${(confidence * 100).toStringAsFixed(0)}';
+    final String confidenceStr = (confidence * 100).toStringAsFixed(0);
 
     // Check if we should use Filipino
     bool useFilipino = currentLocale?.languageCode == 'tl';

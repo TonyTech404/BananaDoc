@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/gemini_service.dart';
-import '../models/leaf_analysis_result.dart';
 import '../models/chat_message.dart';
 import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
@@ -112,9 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 'CAUSE QUESTION DETECTED: Getting explanation for ${chatService.currentDeficiency}');
             response = await _llmService.answerFarmerQuestion(
                 chatService.currentDeficiency,
-                "why do plants have " +
-                    chatService.currentDeficiency +
-                    " deficiency?",
+                "why do plants have ${chatService.currentDeficiency} deficiency?",
                 context: conversationContext);
           }
           // For prevention questions
@@ -123,9 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 'PREVENTION QUESTION DETECTED: Getting prevention for ${chatService.currentDeficiency}');
             response = await _llmService.answerFarmerQuestion(
                 chatService.currentDeficiency,
-                "how to prevent " +
-                    chatService.currentDeficiency +
-                    " deficiency?",
+                "how to prevent ${chatService.currentDeficiency} deficiency?",
                 context: conversationContext);
           }
           // For any other follow-up questions, send with context

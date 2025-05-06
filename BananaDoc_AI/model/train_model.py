@@ -1,12 +1,12 @@
 import os
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from keras.preprocessing.image import ImageDataGenerator
+from keras.applications import MobileNetV2
+from keras.applications.mobilenet_v2 import preprocess_input
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 import matplotlib.pyplot as plt
 
 class BananaLeafDeficiencyModelTrainer:
@@ -20,7 +20,7 @@ class BananaLeafDeficiencyModelTrainer:
         augmented_data_dir="../Images of Nutrient Deficient Banana Plant Leaves/Version-2- Augmented Images of Banana leaves deficient in Nutrients",
         img_size=224,
         batch_size=32,
-        epochs=20
+        epochs=50
     ):
         """
         Initialize the model trainer

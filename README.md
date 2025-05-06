@@ -89,4 +89,4 @@ The app uses the Google Gemini API. The API key is included in the code for demo
 
 1. Store the API key securely (not in source code)
 2. Consider using environment variables or a secure backend
-3. Implement proper API key rotation and management 
+3. Implement proper API key rotation and management # BananaDoc

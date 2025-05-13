@@ -1,0 +1,133 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Asset Test',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const AssetTestScreen(),
+    );
+  }
+}
+
+class AssetTestScreen extends StatefulWidget {
+  const AssetTestScreen({Key? key}) : super(key: key);
+
+  @override
+  State<AssetTestScreen> createState() => _AssetTestScreenState();
+}
+
+class _AssetTestScreenState extends State<AssetTestScreen> {
+  List<String> _logs = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _testAssets();
+  }
+
+  Future<void> _testAssets() async {
+    setState(() {
+      _isLoading = true;
+      _logs = ['Starting asset test...'];
+    });
+
+    try {
+      // Test the TFLite model file
+      await _testAsset(
+          'assets/models/banana_mobile_model.tflite', 'TFLite Model');
+
+      // Test the labels file
+      await _testAsset('assets/models/labels.txt', 'Labels');
+
+      // Test the metadata file
+      await _testAsset('assets/models/model_metadata.json', 'Model Metadata');
+
+      // Test the class mapping file
+      await _testAsset(
+          'assets/models/mobile_class_mapping.txt', 'Class Mapping');
+
+      _addLog('All asset tests completed');
+    } catch (e) {
+      _addLog('Error during asset test: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _testAsset(String assetPath, String description) async {
+    try {
+      _addLog('Testing $description: $assetPath');
+
+      // Try to load the asset
+      final ByteData data = await rootBundle.load(assetPath);
+      final int bytes = data.lengthInBytes;
+
+      _addLog('✅ $description loaded successfully: $bytes bytes');
+
+      // For text files, show their content
+      if (!assetPath.endsWith('.tflite')) {
+        final String content = await rootBundle.loadString(assetPath);
+        _addLog(
+            '   Content: ${content.length > 100 ? '${content.substring(0, 100)}...' : content}');
+      }
+    } catch (e) {
+      _addLog('❌ Failed to load $description: $e');
+    }
+  }
+
+  void _addLog(String log) {
+    setState(() {
+      _logs.add(log);
+    });
+    print(log); // Also print to console for debugging
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Asset Test'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _logs.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Text(
+                    _logs[index],
+                    style: TextStyle(
+                      color: _logs[index].contains('❌')
+                          ? Colors.red
+                          : _logs[index].contains('✅')
+                              ? Colors.green
+                              : null,
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _testAssets,
+        child: const Icon(Icons.refresh),
+      ),
+    );
+  }
+}

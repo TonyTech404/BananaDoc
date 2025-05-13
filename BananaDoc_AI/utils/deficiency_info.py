@@ -84,6 +84,5 @@ class DeficiencyInfoProvider:
             "Magnesium", 
             "Manganese", 
             "Potassium", 
-            "Sulphur", 
             "Zinc"
         ] 

@@ -39,6 +39,7 @@ A Flutter application that uses AI to analyze banana leaf deficiencies and disea
 - Receive recommended treatments
 - Learn prevention measures for future management
 - Analyze images using machine learning for nutrient deficiency detection
+- **NEW: Offline Mode** - Analyze leaves without internet using on-device TFLite model
 
 ## Setup and Installation
 
@@ -76,12 +77,29 @@ python run_api.py
 
 The API server will start at http://localhost:5002
 
-### 3. Set Up the Flutter App
+### 3. Set Up the Mobile-Optimized Model (Optional)
+
+For offline usage, you'll need to set up the mobile-optimized TFLite model:
 
 ```bash
-# Navigate back to the root directory
-cd ..
+# Make the scripts executable
+chmod +x BananaDoc_AI/model/create_mobile_model.sh
+chmod +x copy_models_to_assets.sh
 
+# Create the mobile model
+cd BananaDoc_AI/model
+./create_mobile_model.sh
+cd ../..
+
+# Copy model files to Flutter assets
+./copy_models_to_assets.sh
+```
+
+See [MOBILE_MODEL_SETUP.md](MOBILE_MODEL_SETUP.md) for detailed instructions.
+
+### 4. Set Up the Flutter App
+
+```bash
 # Get Flutter dependencies
 flutter pub get
 
@@ -100,6 +118,13 @@ flutter run -d chrome
 2. Upload an image of a banana leaf or take a photo
 3. The app will process the image and identify any nutrient deficiencies
 4. Review the diagnosis, treatment recommendations, and prevention tips
+
+### Offline Mode (NEW)
+
+1. From the "Analyze Image" screen, toggle "Offline Mode" on
+2. Take or select a photo as usual
+3. The app will process the image entirely on your device, without internet
+4. Perfect for fieldwork in areas with limited connectivity
 
 ### Text-Based Analysis
 

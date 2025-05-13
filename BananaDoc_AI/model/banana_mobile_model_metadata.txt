@@ -1,0 +1,4 @@
+Mobile-optimized banana leaf deficiency detection model
+Architecture: MobileNetV3Large
+Input size: 224x224
+Classes: Boron, Calcium, Healthy, Iron, Magnesium, Manganese, Potassium, Zinc

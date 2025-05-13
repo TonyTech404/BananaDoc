@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from tensorflow.keras.applications.efficientnet import preprocess_input
 
 def load_and_preprocess_image(img_path, target_size=(224, 224)):
     """

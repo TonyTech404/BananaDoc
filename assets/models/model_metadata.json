@@ -1,0 +1,17 @@
+{
+  "model_type": "classification",
+  "input_shape": [1, 224, 224, 3],
+  "output_shape": [1, 8],
+  "labels": [
+    "Healthy",
+    "Nitrogen",
+    "Phosphorus",
+    "Potassium",
+    "Calcium",
+    "Magnesium",
+    "Sulphur",
+    "Iron"
+  ],
+  "is_mock": true,
+  "creation_date": "2023-05-12"
+}

@@ -10,6 +10,7 @@ import 'services/chat_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/llm_service.dart';
 import 'services/nutrient_deficiency_service.dart';
+import 'services/offline_deficiency_service.dart';
 
 // Remove global key - it's causing duplication issues
 // Use a navigation service singleton instead
@@ -20,6 +21,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => ChatHistoryService()),
+        ChangeNotifierProvider(create: (_) => OfflineDeficiencyService()),
       ],
       child: const BananaDocApp(),
     ),
@@ -299,11 +301,19 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
                       // Update language preference
                       final prefs = await SharedPreferences.getInstance();
                       await prefs.setString('selected_language', 'en');
+                      // Force rebuild of the app to ensure translations are applied
+                      if (context.mounted) {
+                        setState(() {});
+                      }
                     } else if (value == 'tl') {
                       localeProvider.setLocale(const Locale('tl', ''));
                       // Update language preference
                       final prefs = await SharedPreferences.getInstance();
                       await prefs.setString('selected_language', 'tl');
+                      // Force rebuild of the app to ensure translations are applied
+                      if (context.mounted) {
+                        setState(() {});
+                      }
                     } else if (value == 'language_selection') {
                       Navigator.pushReplacement(
                         context,

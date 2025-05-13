@@ -1,0 +1,8 @@
+0: Boron
+1: Calcium
+2: Healthy
+3: Iron
+4: Magnesium
+5: Manganese
+6: Potassium
+7: Zinc

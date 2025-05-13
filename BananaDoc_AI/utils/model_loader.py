@@ -47,10 +47,9 @@ class ModelLoader:
                 4: "Magnesium",
                 5: "Manganese",
                 6: "Potassium",
-                7: "Sulphur", 
-                8: "Zinc"
+                7: "Zinc"
             }
-            print("Used default class mapping")
+            print("Used default class mapping without Sulphur class")
     
     def load_model(self):
         """

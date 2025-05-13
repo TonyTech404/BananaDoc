@@ -11,13 +11,19 @@ import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   final LeafAnalysisResult result;
+
+  const ResultScreen({super.key, required this.result});
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
   final LLMService _llmService = LLMService();
   final NutrientDeficiencyService _deficiencyService =
       NutrientDeficiencyService();
-
-  ResultScreen({super.key, required this.result});
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +51,8 @@ class ResultScreen extends StatelessWidget {
                 await prefs.setString('selected_language', 'en');
                 // Update LLMService locale
                 _llmService.currentLocale = const Locale('en', '');
+                // Force refresh UI
+                setState(() {});
               } else if (value == 'tl') {
                 localeProvider.setLocale(const Locale('tl', ''));
                 // Update language preference
@@ -52,6 +60,8 @@ class ResultScreen extends StatelessWidget {
                 await prefs.setString('selected_language', 'tl');
                 // Update LLMService locale
                 _llmService.currentLocale = const Locale('tl', '');
+                // Force refresh UI
+                setState(() {});
               }
             },
             itemBuilder: (context) => [
@@ -106,21 +116,21 @@ class ResultScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildResultSection(
               title: localizations.diagnosis,
-              content: result.diagnosis,
+              content: widget.result.diagnosis,
               icon: Icons.medical_information,
               color: const Color(0xFF4CAF50),
             ),
             const SizedBox(height: 16),
             _buildResultSection(
               title: localizations.recommendedTreatment,
-              content: result.treatment,
+              content: widget.result.treatment,
               icon: Icons.healing,
               color: const Color(0xFF2196F3),
             ),
             const SizedBox(height: 16),
             _buildResultSection(
               title: localizations.preventionTips,
-              content: result.prevention,
+              content: widget.result.prevention,
               icon: Icons.shield,
               color: const Color(0xFFFF9800),
             ),
@@ -144,12 +154,12 @@ class ResultScreen extends StatelessWidget {
 
                 // Clear any existing chat and set the current deficiency
                 chatService.clearMessages();
-                chatService.setDeficiency(result.deficiencyType);
+                chatService.setDeficiency(widget.result.deficiencyType);
 
                 // Add initial message from assistant
                 final welcomeMessage = ChatMessage(
                   text:
-                      'I can help answer your questions about ${result.deficiencyType} deficiency in your banana plants. What would you like to know?',
+                      'I can help answer your questions about ${widget.result.deficiencyType} deficiency in your banana plants. What would you like to know?',
                   isUser: false,
                 );
                 chatService.addMessage(welcomeMessage);
@@ -158,7 +168,8 @@ class ResultScreen extends StatelessWidget {
                   // Get explanation from LLM
                   final explanation =
                       await _llmService.getDeficiencyExplanation(
-                          result.deficiencyType, result.confidence);
+                          widget.result.deficiencyType,
+                          widget.result.confidence);
 
                   // Add explanation message
                   final explanationMessage = ChatMessage(
@@ -169,7 +180,7 @@ class ResultScreen extends StatelessWidget {
 
                   // Get treatment recommendation
                   final treatment = await _llmService
-                      .getTreatmentRecommendation(result.deficiencyType);
+                      .getTreatmentRecommendation(widget.result.deficiencyType);
 
                   // Add treatment message
                   final treatmentMessage = ChatMessage(
@@ -181,7 +192,7 @@ class ResultScreen extends StatelessWidget {
                   // If there's an error, at least add a basic message
                   final errorMessage = ChatMessage(
                     text:
-                        'I detected a ${result.deficiencyType} deficiency in your banana plant. I can answer questions about this condition.',
+                        'I detected a ${widget.result.deficiencyType} deficiency in your banana plant. I can answer questions about this condition.',
                     isUser: false,
                   );
                   chatService.addMessage(errorMessage);

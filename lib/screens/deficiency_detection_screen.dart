@@ -1,17 +1,18 @@
 import 'dart:io';
-import 'dart:html' as html;
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../services/nutrient_deficiency_service.dart';
+import '../services/offline_deficiency_service.dart';
 import '../models/leaf_analysis_result.dart';
-import 'result_screen.dart';
+import '../widgets/analysis_result_card.dart';
+import '../widgets/image_display.dart';
+import '../screens/chat_screen.dart';
 import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/tflite_service.dart';
 
 class DeficiencyDetectionScreen extends StatefulWidget {
   const DeficiencyDetectionScreen({Key? key}) : super(key: key);
@@ -22,284 +23,450 @@ class DeficiencyDetectionScreen extends StatefulWidget {
 }
 
 class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
-  final NutrientDeficiencyService _deficiencyService =
-      NutrientDeficiencyService();
+  // For non-web platforms
   File? _selectedImageFile;
+  // For web platform
   Uint8List? _selectedImageBytes;
+
   bool _isLoading = false;
-  bool _isApiAvailable = false;
-  String _errorMessage = '';
+  bool _isInitializing = true;
+  LeafAnalysisResult? _analysisResult;
+  String? _errorMessage;
+  final NutrientDeficiencyService _apiService = NutrientDeficiencyService();
 
   @override
   void initState() {
     super.initState();
-    _checkApiStatus();
+    _initializeModelOnStartup();
+  }
 
-    // Set initial locale
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final localeProvider =
-          Provider.of<LocaleProvider>(context, listen: false);
-      _deficiencyService.currentLocale = localeProvider.locale;
+  Future<void> _initializeModelOnStartup() async {
+    setState(() {
+      _isInitializing = true;
+    });
+
+    final offlineService =
+        Provider.of<OfflineDeficiencyService>(context, listen: false);
+    final success = await offlineService.ensureModelInitialized();
+
+    setState(() {
+      _isInitializing = false;
+      if (!success) {
+        _errorMessage = offlineService.errorMessage ??
+            'Failed to initialize model. Please restart the app.';
+      }
     });
   }
 
-  Future<void> _checkApiStatus() async {
-    try {
-      final isAvailable = await _deficiencyService.isApiAvailable();
-      setState(() {
-        _isApiAvailable = isAvailable;
-        if (!isAvailable) {
-          _errorMessage =
-              'The AI model server is not available. Make sure it\'s running at ${NutrientDeficiencyService.baseUrl}';
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isApiAvailable = false;
-        _errorMessage = 'Failed to connect to AI server: $e';
-      });
-    }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update service locale when app locale changes
+    final locale = Localizations.localeOf(context);
+    _apiService.currentLocale = locale;
+
+    // Also update TFLite service locale
+    final offlineService =
+        Provider.of<OfflineDeficiencyService>(context, listen: false);
+    final tfliteService = TFLiteService();
+    tfliteService.currentLocale = locale;
+
+    // Force refresh UI when language changes
+    setState(() {});
   }
 
+  // Check if we have a selected image (either file or bytes)
+  bool get hasSelectedImage =>
+      kIsWeb ? _selectedImageBytes != null : _selectedImageFile != null;
+
   Future<void> _pickImage(ImageSource source) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
-      final pickedImage = await _deficiencyService.pickImage(source: source);
+      final offlineService =
+          Provider.of<OfflineDeficiencyService>(context, listen: false);
+
+      // Always use offline service to pick image (works in both online and offline modes)
+      final pickedImage = await offlineService.pickImage(source: source);
+
       if (pickedImage != null) {
         setState(() {
           if (kIsWeb) {
-            _selectedImageBytes = pickedImage;
+            // Web platform returns bytes
+            _selectedImageBytes = pickedImage as Uint8List;
             _selectedImageFile = null;
           } else {
+            // Mobile platforms return File
             _selectedImageFile = pickedImage as File;
             _selectedImageBytes = null;
           }
-          _errorMessage = '';
+          _analysisResult = null;
         });
       }
     } catch (e) {
       setState(() {
         _errorMessage = 'Error picking image: $e';
       });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _analyzeImage() async {
-    final localizations = AppLocalizations.of(context);
-
-    if ((_selectedImageFile == null && _selectedImageBytes == null) ||
-        (kIsWeb && _selectedImageBytes == null) ||
-        (!kIsWeb && _selectedImageFile == null)) {
+    if (!hasSelectedImage) {
       setState(() {
         _errorMessage = 'Please select an image first';
       });
       return;
     }
 
-    if (!_isApiAvailable) {
-      setState(() {
-        _errorMessage = localizations.serverNotAvailable;
-      });
-      return;
-    }
-
     setState(() {
       _isLoading = true;
-      _errorMessage = '';
+      _errorMessage = null;
     });
 
     try {
-      final result = kIsWeb
-          ? await _deficiencyService.analyzeImageWeb(_selectedImageBytes!)
-          : await _deficiencyService.analyzeImage(_selectedImageFile!);
+      final offlineService =
+          Provider.of<OfflineDeficiencyService>(context, listen: false);
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+      // Ensure model is initialized
+      if (!offlineService.isModelInitialized) {
+        final initialized = await offlineService.ensureModelInitialized();
+        if (!initialized) {
+          setState(() {
+            _errorMessage = offlineService.errorMessage ??
+                'Failed to initialize model. Please restart the app.';
+            _isLoading = false;
+          });
+          return;
+        }
+      }
 
-        // Navigate to results screen
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ResultScreen(result: result),
-          ),
-        );
+      LeafAnalysisResult result;
+
+      // Use the appropriate method based on platform
+      if (kIsWeb) {
+        // Web platform
+        if (_selectedImageBytes == null) {
+          throw Exception('Image data is missing');
+        }
+
+        // Add more detailed logging for web
+        debugPrint(
+            'Analyzing image on web platform: ${_selectedImageBytes!.length} bytes');
+        result = await offlineService.analyzeImage(_selectedImageBytes!);
+      } else {
+        // Mobile platform
+        if (_selectedImageFile == null) {
+          throw Exception('Image file is missing');
+        }
+
+        debugPrint(
+            'Analyzing image on mobile platform: ${_selectedImageFile!.path}');
+        result = await offlineService.analyzeImage(_selectedImageFile!);
+      }
+
+      setState(() {
+        _analysisResult = result;
+      });
+
+      // After analysis, update any context-aware components
+      if (_analysisResult != null) {
+        debugPrint(
+            'Analysis complete: ${_analysisResult!.deficiencyType} detected');
+        _passAnalysisToChat(_analysisResult!);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Error analyzing image: $e';
-        });
-      }
+      debugPrint('Error analyzing image: $e');
+      setState(() {
+        _errorMessage = 'Error analyzing image: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
+  }
+
+  // Method to pass analysis results to chat context
+  void _passAnalysisToChat(LeafAnalysisResult result) {
+    // Store the result in the offline service for context awareness
+    final offlineService =
+        Provider.of<OfflineDeficiencyService>(context, listen: false);
+
+    // The result is already saved during analysis, but log for debugging
+    debugPrint('Analysis context available: ${result.deficiencyType}');
+
+    // Navigation is now handled by the button in AnalysisResultCard
+    // This method is kept for potential programmatic navigation
   }
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    final localeProvider = Provider.of<LocaleProvider>(context);
+    final localeProvider = Provider.of<LocaleProvider>(context, listen: true);
 
-    // Update the NutrientDeficiencyService locale when it changes
-    _deficiencyService.currentLocale = localeProvider.locale;
+    // Update service locale when app locale changes
+    _apiService.currentLocale = localeProvider.locale;
+
+    if (_isInitializing) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(localizations.deficiencyDetection),
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 24),
+              Text(localizations.analyzing),
+              const SizedBox(height: 8),
+              const Text('This may take a moment',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.deficiencyDetection),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // API Status indicator
-            if (!_isApiAvailable)
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+        elevation: 0,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'en') {
+                localeProvider.setLocale(const Locale('en', ''));
+                // Also update TFLite service locale
+                final tfliteService = TFLiteService();
+                tfliteService.currentLocale = const Locale('en', '');
+                // Force refresh UI
+                setState(() {});
+              } else if (value == 'tl') {
+                localeProvider.setLocale(const Locale('tl', ''));
+                // Also update TFLite service locale
+                final tfliteService = TFLiteService();
+                tfliteService.currentLocale = const Locale('tl', '');
+                // Force refresh UI
+                setState(() {});
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'en',
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Colors.red.shade700),
-                    const SizedBox(width: 10),
+                    if (localeProvider.locale.languageCode == 'en')
+                      const Icon(Icons.check, color: Colors.green),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        localizations.serverNotAvailable,
-                        style: TextStyle(color: Colors.red.shade700),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.refresh, color: Colors.red.shade700),
-                      onPressed: _checkApiStatus,
-                      tooltip: localizations.refresh,
+                      child: Text(localizations.english),
                     ),
                   ],
                 ),
               ),
-
-            const SizedBox(height: 20),
-
-            // Image preview
-            Container(
-              height: 300,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+              PopupMenuItem(
+                value: 'tl',
+                child: Row(
+                  children: [
+                    if (localeProvider.locale.languageCode == 'tl')
+                      const Icon(Icons.check, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(localizations.filipino),
+                    ),
+                  ],
+                ),
               ),
-              child: _hasSelectedImage()
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: _displaySelectedImage(),
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.image_outlined,
-                            size: 80,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            localizations.selectImage,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey.shade600,
+            ],
+            icon: const Icon(Icons.language),
+            tooltip: localizations.selectLanguage,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Status banner (only shows for errors)
+                    if (_errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline,
+                                color: Colors.red.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(color: Colors.red.shade900),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+
+                    // Image selection buttons
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.eco, color: Colors.green),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    localizations.deficiencyDetection,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              localizations.selectImage,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildImageSourceButton(
+                                  icon: Icons.photo_library,
+                                  label: localizations.gallery,
+                                  onPressed: () =>
+                                      _pickImage(ImageSource.gallery),
+                                ),
+                                _buildImageSourceButton(
+                                  icon: Icons.camera_alt,
+                                  label: localizations.camera,
+                                  onPressed: () =>
+                                      _pickImage(ImageSource.camera),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-            ),
 
-            // Error message
-            if (_errorMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 16.0),
-                child: Text(
-                  _errorMessage,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
+                    const SizedBox(height: 16),
+
+                    // Selected image display
+                    if (hasSelectedImage) ...[
+                      _buildImageDisplay(localizations),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Analysis results
+                    if (_analysisResult != null)
+                      AnalysisResultCard(result: _analysisResult!),
+                  ],
                 ),
               ),
-
-            const SizedBox(height: 20),
-
-            // Image source buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () => _pickImage(ImageSource.camera),
-                    icon: const Icon(Icons.camera_alt),
-                    label: Text(localizations.takePhoto),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () => _pickImage(ImageSource.gallery),
-                    icon: const Icon(Icons.photo_library),
-                    label: Text(localizations.uploadImage),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: Theme.of(context).colorScheme.secondary,
-                      foregroundColor: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
             ),
+    );
+  }
 
-            const SizedBox(height: 20),
+  // Build the appropriate image display widget based on platform
+  Widget _buildImageDisplay(AppLocalizations localizations) {
+    final offlineService =
+        Provider.of<OfflineDeficiencyService>(context, listen: false);
 
-            // Analyze button
-            ElevatedButton(
-              onPressed: _isLoading ? null : _analyzeImage,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: const Color(0xFF4CAF50),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey,
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade700, width: 1),
               ),
-              child: _isLoading
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(localizations.analyzing),
-                      ],
+              child: Row(
+                children: [
+                  Icon(Icons.offline_bolt, color: Colors.green.shade800),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Analysis will be performed directly on your device',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: kIsWeb
+                  ? Image.memory(
+                      _selectedImageBytes!,
+                      height: 250,
+                      fit: BoxFit.cover,
                     )
-                  : const Text(
-                      'Analyze Leaf',
-                      style: TextStyle(fontSize: 18),
+                  : Image.file(
+                      _selectedImageFile!,
+                      height: 250,
+                      fit: BoxFit.cover,
                     ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _analyzeImage,
+              icon: const Icon(
+                Icons.search,
+                size: 24,
+              ),
+              label: Text(
+                localizations.analyze,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade600,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ],
         ),
@@ -307,25 +474,25 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
     );
   }
 
-  bool _hasSelectedImage() {
-    return (kIsWeb && _selectedImageBytes != null) ||
-        (!kIsWeb && _selectedImageFile != null);
-  }
-
-  Widget _displaySelectedImage() {
-    if (kIsWeb && _selectedImageBytes != null) {
-      return Image.memory(
-        _selectedImageBytes!,
-        fit: BoxFit.cover,
-        width: double.infinity,
-      );
-    } else if (!kIsWeb && _selectedImageFile != null) {
-      return Image.file(
-        _selectedImageFile!,
-        fit: BoxFit.cover,
-        width: double.infinity,
-      );
-    }
-    return Container(); // Fallback
+  Widget _buildImageSourceButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            shape: const CircleBorder(),
+            padding: const EdgeInsets.all(16),
+            backgroundColor: Colors.green.shade600,
+          ),
+          child: Icon(icon, size: 30, color: Colors.white),
+        ),
+        const SizedBox(height: 8),
+        Text(label),
+      ],
+    );
   }
 }

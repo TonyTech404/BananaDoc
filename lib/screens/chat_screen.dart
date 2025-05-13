@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
 import '../services/llm_service.dart';
+import '../models/leaf_analysis_result.dart';
+import '../services/offline_deficiency_service.dart';
+import '../localization/app_localizations.dart';
+import '../providers/locale_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatMessage {
   final String text;
@@ -10,12 +16,14 @@ class ChatMessage {
 }
 
 class ChatScreen extends StatefulWidget {
-  final String deficiencyType;
-  final double confidence;
+  final LeafAnalysisResult? analysisResult;
+  final String? initialMessage;
 
-  const ChatScreen(
-      {Key? key, required this.deficiencyType, required this.confidence})
-      : super(key: key);
+  const ChatScreen({
+    Key? key,
+    this.analysisResult,
+    this.initialMessage,
+  }) : super(key: key);
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -27,59 +35,124 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
+  late LeafAnalysisResult? _currentAnalysis;
+
+  // Add a conversation history string to maintain context
+  String _conversationHistory = "";
+
   @override
   void initState() {
     super.initState();
+
+    _currentAnalysis = widget.analysisResult;
+
+    if (_currentAnalysis == null) {
+      final offlineService =
+          Provider.of<OfflineDeficiencyService>(context, listen: false);
+      _currentAnalysis = offlineService.lastAnalysisResult;
+    }
+
     _addInitialMessages();
   }
 
   void _addInitialMessages() async {
-    // Add welcome message
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text:
-              'I can help answer your questions about ${widget.deficiencyType} deficiency in your banana plants. What would you like to know?',
-          isUser: false,
-        ),
+    if (widget.initialMessage != null) {
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text: widget.initialMessage!,
+            isUser: false,
+          ),
+        );
+        // Add initial message to conversation history
+        _updateConversationHistory("AI", widget.initialMessage!);
+      });
+    }
+
+    if (_currentAnalysis != null) {
+      // Generate welcome message based on current locale
+      final String welcomeMessage;
+      if (_llmService.currentLocale?.languageCode == 'tl') {
+        welcomeMessage =
+            'Ako ay makakatulong sa iyong mga katanungan tungkol sa kakulangan ng ${_currentAnalysis!.deficiencyType} sa iyong mga puno ng saging. Ano ang nais mong malaman?';
+      } else {
+        welcomeMessage =
+            'I can help answer your questions about ${_currentAnalysis!.deficiencyType} deficiency in your banana plants. What would you like to know?';
+      }
+
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text: welcomeMessage,
+            isUser: false,
+          ),
+        );
+        // Add welcome message to conversation history
+        _updateConversationHistory("AI", welcomeMessage);
+      });
+
+      setState(() {
+        _isLoading = true;
+      });
+
+      final explanation = await _llmService.getDeficiencyExplanation(
+        _currentAnalysis!.deficiencyType,
+        _currentAnalysis!.confidence,
       );
-    });
 
-    // Add detailed explanation
-    setState(() {
-      _isLoading = true;
-    });
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text: explanation,
+            isUser: false,
+          ),
+        );
+        _isLoading = false;
+        // Add explanation to conversation history
+        _updateConversationHistory("AI", explanation);
+      });
 
-    final explanation = await _llmService.getDeficiencyExplanation(
-        widget.deficiencyType, widget.confidence);
+      setState(() {
+        _isLoading = true;
+      });
 
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: explanation,
-          isUser: false,
-        ),
+      final treatment = await _llmService.getTreatmentRecommendation(
+        _currentAnalysis!.deficiencyType,
       );
-      _isLoading = false;
-    });
 
-    // Add treatment recommendation
-    setState(() {
-      _isLoading = true;
-    });
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text: treatment,
+            isUser: false,
+          ),
+        );
+        _isLoading = false;
+        // Add treatment to conversation history
+        _updateConversationHistory("AI", treatment);
+      });
+    } else {
+      // Generate general welcome message based on current locale
+      final String welcomeMessage;
+      if (_llmService.currentLocale?.languageCode == 'tl') {
+        welcomeMessage =
+            'Mabuhay! Makakatulong ako sa mga isyu ng nutrisyon ng iyong mga halaman ng saging. Mangyaring suriin muna ang larawan ng dahon o magtanong ng pangkalahatang mga katanungan.';
+      } else {
+        welcomeMessage =
+            'Welcome! I can help with banana plant nutrition issues. Please analyze a leaf image first or ask general questions.';
+      }
 
-    final treatment =
-        await _llmService.getTreatmentRecommendation(widget.deficiencyType);
-
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: treatment,
-          isUser: false,
-        ),
-      );
-      _isLoading = false;
-    });
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            text: welcomeMessage,
+            isUser: false,
+          ),
+        );
+        // Add welcome message to conversation history
+        _updateConversationHistory("AI", welcomeMessage);
+      });
+    }
   }
 
   void _handleSubmitted(String text) async {
@@ -95,16 +168,45 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
       _isLoading = true;
+      // Add user message to conversation history
+      _updateConversationHistory("User", text);
     });
 
-    // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
 
-    // Get answer from LLM
-    final answer =
-        await _llmService.answerFarmerQuestion(widget.deficiencyType, text);
+    // Create rich context info that includes:
+    // 1. Deficiency diagnosis information
+    // 2. Full conversation history
+    String contextInfo = "";
+
+    // Add deficiency information
+    if (_currentAnalysis != null) {
+      contextInfo = "DIAGNOSIS INFORMATION:\n"
+          "Deficiency: ${_currentAnalysis!.deficiencyType}\n"
+          "Confidence: ${(_currentAnalysis!.confidence * 100).toStringAsFixed(1)}%\n"
+          "Diagnosis: ${_currentAnalysis!.diagnosis}\n"
+          "Treatment: ${_currentAnalysis!.treatment}\n"
+          "Prevention: ${_currentAnalysis!.prevention}\n\n";
+    } else {
+      final offlineService =
+          Provider.of<OfflineDeficiencyService>(context, listen: false);
+      contextInfo = "DIAGNOSIS INFORMATION:\n" +
+          offlineService.getContextForChat() +
+          "\n\n";
+    }
+
+    // Add full conversation history
+    contextInfo += "CONVERSATION HISTORY:\n" + _conversationHistory;
+
+    print("Using context: $contextInfo");
+
+    final answer = await _llmService.answerFarmerQuestion(
+      _currentAnalysis?.deficiencyType ?? "unknown",
+      text,
+      context: contextInfo,
+    );
 
     setState(() {
       _messages.add(
@@ -114,12 +216,21 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
       _isLoading = false;
+      // Add AI response to conversation history
+      _updateConversationHistory("AI", answer);
     });
 
-    // Scroll to bottom again
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
+  }
+
+  // Update conversation history with new messages
+  void _updateConversationHistory(String speaker, String message) {
+    // Don't use setState here as it can cause issues with async operations
+    _conversationHistory += "$speaker: $message\n\n";
+    print(
+        "Conversation history updated, new length: ${_conversationHistory.length}");
   }
 
   void _scrollToBottom() {
@@ -136,11 +247,86 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
+    // Update LLM service locale
+    _llmService.currentLocale = localeProvider.locale;
+
+    // Generate title based on language
+    final String title;
+    if (localeProvider.locale.languageCode == 'tl') {
+      title = 'Tagapayo sa ${_currentAnalysis?.deficiencyType ?? "Hindi Alam"}';
+    } else {
+      title = '${_currentAnalysis?.deficiencyType ?? "Unknown"} Assistant';
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.deficiencyType} Assistant'),
+        title: Text(title),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'en') {
+                localeProvider.setLocale(const Locale('en', ''));
+                // Update language preference
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('selected_language', 'en');
+                // Update LLM service locale
+                _llmService.currentLocale = const Locale('en', '');
+
+                // Reset conversation and start over in English
+                setState(() {
+                  _messages.clear();
+                  _conversationHistory = "";
+                });
+                _addInitialMessages();
+              } else if (value == 'tl') {
+                localeProvider.setLocale(const Locale('tl', ''));
+                // Update language preference
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('selected_language', 'tl');
+                // Update LLM service locale
+                _llmService.currentLocale = const Locale('tl', '');
+
+                // Reset conversation and start over in Filipino
+                setState(() {
+                  _messages.clear();
+                  _conversationHistory = "";
+                });
+                _addInitialMessages();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'en',
+                child: Row(
+                  children: [
+                    if (localeProvider.locale.languageCode == 'en')
+                      const Icon(Icons.check, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(localizations.english),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'tl',
+                child: Row(
+                  children: [
+                    if (localeProvider.locale.languageCode == 'tl')
+                      const Icon(Icons.check, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(localizations.filipino),
+                  ],
+                ),
+              ),
+            ],
+            icon: const Icon(Icons.language),
+            tooltip: localizations.selectLanguage,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -215,6 +401,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea() {
+    final isTagalog = _llmService.currentLocale?.languageCode == 'tl';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       margin: const EdgeInsets.only(bottom: 16.0, top: 8.0),
@@ -224,7 +412,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: TextField(
               controller: _textController,
               decoration: InputDecoration(
-                hintText: 'Ask a question...',
+                hintText: isTagalog ? 'Magtanong...' : 'Ask a question...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24.0),
                 ),

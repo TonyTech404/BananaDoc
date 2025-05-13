@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' show max;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -20,11 +21,72 @@ class LLMService {
       String deficiencyType, double confidence) async {
     try {
       // In a real app, you would call your LLM API here
-      // For now, let's simulate with static content
-      return _generateDeficiencyExplanation(deficiencyType, confidence);
+      // For now, let's simulate with static content based on the current locale
+      if (currentLocale?.languageCode == 'tl') {
+        return _generateTagalogDeficiencyExplanation(
+            deficiencyType, confidence);
+      } else {
+        return _generateDeficiencyExplanation(deficiencyType, confidence);
+      }
     } catch (e) {
       print('Error getting deficiency explanation: $e');
-      return 'Unable to generate explanation. Please try again later.';
+      if (currentLocale?.languageCode == 'tl') {
+        return 'Hindi ma-generate ang paliwanag sa ngayon. Pakisubukang muli mamaya.';
+      } else {
+        return 'Unable to generate explanation. Please try again later.';
+      }
+    }
+  }
+
+  // Generate explanation in English
+  String _generateDeficiencyExplanation(
+      String deficiencyType, double confidence) {
+    final confidencePercent = (confidence * 100).toStringAsFixed(0);
+
+    switch (deficiencyType) {
+      case 'Calcium':
+        return 'Your banana plants are showing signs of Calcium deficiency ($confidencePercent% confidence). Calcium is crucial for cell wall development. Deficiency shows as chlorosis of leaf margins, distorted growth, and weakened structural integrity. Fruits may show premature ripening.';
+
+      case 'Nitrogen':
+        return 'Your banana plants are showing signs of Nitrogen deficiency ($confidencePercent% confidence). Nitrogen is essential for leaf and stem growth. Deficiency appears as yellowing of older leaves, stunted growth, and reduced fruit size and yield.';
+
+      case 'Potassium':
+        return 'Your banana plants are showing signs of Potassium deficiency ($confidencePercent% confidence). Potassium is key for fruit development and disease resistance. Symptoms include yellow/orange discoloration along leaf margins, starting with older leaves, and reduced fruit quality.';
+
+      case 'Magnesium':
+        return 'Your banana plants are showing signs of Magnesium deficiency ($confidencePercent% confidence). Magnesium is essential for chlorophyll production. Deficiency shows as interveinal chlorosis (yellow between green veins) on older leaves, proceeding to younger leaves as the deficiency worsens.';
+
+      case 'Sulphur':
+        return 'Your banana plants are showing signs of Sulphur deficiency ($confidencePercent% confidence). Sulphur is important for protein synthesis and enzyme production. Deficiency appears as uniform yellowing of young leaves, thin stems, and slow growth.';
+
+      default:
+        return 'Your banana plants are showing signs of $deficiencyType deficiency ($confidencePercent% confidence). This nutrient is important for overall plant health and productivity. The specific symptoms vary but can impact growth, leaf appearance, and fruit quality.';
+    }
+  }
+
+  // Generate explanation in Tagalog/Filipino
+  String _generateTagalogDeficiencyExplanation(
+      String deficiencyType, double confidence) {
+    final confidencePercent = (confidence * 100).toStringAsFixed(0);
+
+    switch (deficiencyType) {
+      case 'Calcium':
+        return 'Ang iyong mga puno ng saging ay nagpapakita ng senyales ng kakulangan sa Calcium ($confidencePercent% kumpiyansa). Ang Calcium ay mahalaga para sa pagbuo ng pader ng selula. Ang kakulangan ay lumalabas bilang chlorosis ng mga gilid ng dahon, abnormal na paglaki, at mahinang istraktura. Ang mga prutas ay maaaring magkaroon ng maagang paghinog.';
+
+      case 'Nitrogen':
+        return 'Ang iyong mga puno ng saging ay nagpapakita ng senyales ng kakulangan sa Nitrogen ($confidencePercent% kumpiyansa). Ang Nitrogen ay kinakailangan para sa paglaki ng dahon at tangkay. Ang kakulangan ay lumalabas bilang pagdilaw ng mas lumang mga dahon, pinipigilan ang paglaki, at binabawasan ang laki at dami ng prutas.';
+
+      case 'Potassium':
+        return 'Ang iyong mga puno ng saging ay nagpapakita ng senyales ng kakulangan sa Potassium ($confidencePercent% kumpiyansa). Ang Potassium ay susi para sa paglaki ng prutas at resistensya sa sakit. Ang mga sintomas ay kinabibilangan ng dilaw/kulay-kahel na pagkasira sa mga gilid ng dahon, nagsisimula sa mas lumang mga dahon, at pinababang kalidad ng prutas.';
+
+      case 'Magnesium':
+        return 'Ang iyong mga puno ng saging ay nagpapakita ng senyales ng kakulangan sa Magnesium ($confidencePercent% kumpiyansa). Ang Magnesium ay mahalaga para sa produksyon ng chlorophyll. Ang kakulangan ay lumalabas bilang interveinal chlorosis (dilaw sa pagitan ng berdeng ugat) sa mas lumang mga dahon, patungo sa mas batang mga dahon habang lumalala ang kakulangan.';
+
+      case 'Sulphur':
+        return 'Ang iyong mga puno ng saging ay nagpapakita ng senyales ng kakulangan sa Sulphur ($confidencePercent% kumpiyansa). Ang Sulphur ay mahalaga para sa pagbuo ng protina at produksyon ng enzyme. Ang kakulangan ay lumalabas bilang pantay na pagdilaw ng mga batang dahon, manipis na mga tangkay, at mababagal na paglaki.';
+
+      default:
+        return 'Ang iyong mga puno ng saging ay nagpapakita ng senyales ng kakulangan sa $deficiencyType ($confidencePercent% kumpiyansa). Ang sustansyang ito ay mahalaga para sa pangkalahatang kalusugan at produktibidad ng halaman. Ang mga partikular na sintomas ay nagkakaiba ngunit maaaring makaapekto sa paglaki, anyo ng dahon, at kalidad ng prutas.';
     }
   }
 
@@ -53,7 +115,7 @@ class LLMService {
     }
   }
 
-  // For answering farmer questions
+  // For answering farmer questions with improved context awareness
   Future<String> answerFarmerQuestion(String deficiencyType, String question,
       {String? context}) async {
     try {
@@ -67,54 +129,215 @@ class LLMService {
 
       print('Is Tagalog: $isTagalog');
 
-      // If we have a deficiency type and context, always use context-based responses
-      // instead of just checking for simple action questions
-      if (deficiencyType.isNotEmpty && context != null && context.isNotEmpty) {
-        print('Using context-aware response for $deficiencyType');
+      // ALWAYS use contextual responses when context is provided
+      if (context != null && context.isNotEmpty) {
+        print(
+            'Using context-aware response for $deficiencyType with full conversation history');
+        print('Context length: ${context.length}');
 
-        // For simple action questions, provide direct treatment advice
-        bool isSimpleActionQuestion =
-            _isSimpleActionQuestion(question, isTagalog);
-        if (isSimpleActionQuestion) {
-          print('Simple action question detected, providing treatment answer');
-          return _generateSpecificTreatmentAnswer(deficiencyType, isTagalog);
+        // Special case for timeline questions which are always follow-ups in a diagnosis context
+        if (_isTimelineQuestion(question, isTagalog)) {
+          print('Is follow-up question: true (timeline question)');
+
+          if (isTagalog) {
+            return 'Para sa $deficiencyType deficiency na nakita sa iyong saging, makikita mo ang pagbabago sa loob ng 2-4 na linggo kung gumamit ka ng foliar spray. Para naman sa soil application, umaabot ng 1-2 buwan bago makita ang buong epekto. Makikita mo muna ang pagbabago sa mga bagong dahon.';
+          } else {
+            return 'For the $deficiencyType deficiency detected in your banana plants, you should see improvement within 2-4 weeks if using foliar sprays. For soil applications, expect to wait 1-2 months to see the full effect. New leaves will show improvement first.';
+          }
         }
 
-        // For other questions, generate a contextual response based on the deficiency
-        // and conversation history
+        // Special case for cost questions
+        if (question.toLowerCase().contains("cost") ||
+            question.toLowerCase().contains("price") ||
+            question.toLowerCase().contains("expensive") ||
+            question.toLowerCase().contains("cheap") ||
+            question.toLowerCase().contains("how much")) {
+          print('Is follow-up question: true (cost question)');
+
+          switch (deficiencyType) {
+            case 'Calcium':
+              return 'For treating Calcium deficiency, here\'s a breakdown of approximate costs in the Philippines:\n\n'
+                  '- Calcium nitrate: ₱600-800 per 25kg bag, enough for 0.25-0.5 hectare\n'
+                  '- Agricultural lime: ₱200-400 per 40kg bag for pH adjustment and calcium\n'
+                  '- Calcium foliar spray: ₱300-600 per liter of concentrate\n\n'
+                  'For a small farm, total costs would range from ₱1,500-3,000 depending on severity and plantation size. Early treatment is more cost-effective than waiting until deficiency symptoms are severe.';
+            case 'Potassium':
+              return 'For Potassium deficiency treatment in the Philippines, the costs typically include:\n\n'
+                  '- Potassium sulfate (SOP): ₱800-1,200 per 25kg bag\n'
+                  '- Potassium chloride (MOP): ₱600-900 per 25kg bag\n'
+                  '- Potassium nitrate foliar spray: ₱400-700 per liter\n\n'
+                  'For a typical banana plantation, budget around ₱2,000-4,000 per hectare for treatment. This is a worthwhile investment as potassium directly affects fruit quality and yield, providing good return on investment through improved harvest.';
+            default:
+              return 'For $deficiencyType deficiency treatment in the Philippines, typical costs include:\n\n'
+                  '- Commercial fertilizers: ₱500-1,200 per bag depending on formulation\n'
+                  '- Foliar sprays: ₱300-800 per liter of concentrate\n'
+                  '- Organic amendments: ₱200-500 per bag\n\n'
+                  'For a small plantation (0.5-1 hectare), a total budget of ₱2,000-5,000 should address the deficiency. You\'ll save money in the long run by doing regular soil testing and balanced fertilization to prevent deficiencies from occurring.';
+          }
+        }
+
+        // Special case for fertilizer questions
+        if (question.toLowerCase().contains("fertilizer") ||
+            question.toLowerCase().contains("what should i use") ||
+            question.toLowerCase().contains("what to use") ||
+            question.toLowerCase().contains("pataba") ||
+            question.toLowerCase().contains("abono")) {
+          print('Is follow-up question: true (fertilizer question)');
+
+          switch (deficiencyType) {
+            case 'Calcium':
+              return 'Para sa Calcium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+                  '1. **Calcium nitrate (15.5% N, 19% Ca)** - Mabilis kumilos na source ng calcium, mag-apply ng 2-5 kg bawat ektarya\n'
+                  '2. **Calcium sulfate (Gypsum, 22% Ca)** - Mas mabagal na release, mainam para sa soil application sa 500-1000 kg bawat ektarya\n'
+                  '3. **Dolomitic lime (Calcium Magnesium Carbonate)** - Para sa acidic na lupa, 1-2 toneladang bawat ektarya depende sa pH ng lupa\n'
+                  '4. **Calcium chelate** - Para sa foliar spray, gamitin sa 2-3 g/L concentration\n\n'
+                  'Para sa agarang resulta, gumamit ng foliar spray na may calcium chloride (2% solution). Para sa pangmatagalang solusyon, isama ang gypsum o lime sa lupa. Laging sundin ang mga tagubilin sa produkto para sa eksaktong rate ng application.';
+            case 'Potassium':
+              return 'Para sa Potassium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+                  '1. **Potassium sulfate (SOP, 50% K₂O)** - Mas mababang salt index, angkop para sa saging sa 300-500 kg/ektarya\n'
+                  '2. **Potassium chloride (MOP, 60% K₂O)** - Mas abot-kayang opsyon, gamitin sa 250-400 kg/ektarya\n'
+                  '3. **Potassium nitrate (13% N, 44% K₂O)** - Mabilis na pagsipsip, mainam para sa foliar application sa 2-3% solution\n'
+                  '4. **NPK fertilizers na mataas sa K** - Tulad ng 13-0-46 o katulad na ratio\n\n'
+                  'Para sa agarang resulta, mag-apply ng potassium nitrate bilang foliar spray. Para sa pangmatagalang pangangalaga, gumamit ng potassium sulfate dahil naglalaman din ito ng sulfur. Iwasan ang sobrang paglalagay ng magnesium fertilizer dahil nakikipagkompetensya ito sa pagsipsip ng potassium.';
+            case 'Sulphur':
+              return 'Para sa Sulphur deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+                  '1. **Elemental sulphur** - Mabagal na release, 90-99% S, mag-apply ng 20-30 kg/ektarya\n'
+                  '2. **Ammonium sulphate** - 24% S at 21% N, mag-apply ng 100-200 kg/ektarya\n'
+                  '3. **Potassium sulphate** - 18% S at 50% K₂O, mainam kung parehong nutrients ang kailangan\n'
+                  '4. **Gypsum (Calcium sulphate)** - 13-18% S at 22% Ca, mag-apply ng 200-300 kg/ektarya\n\n'
+                  'Ang elemental sulphur ay nangangailangan ng panahon para maging available sa halaman, kaya ang ammonium sulphate o potassium sulphate ay mas mainam para sa mas mabilis na resulta. Ang foliar sprays na may sulphate ay makakapagbigay ng mabilis na pagwawasto ng mga sintomas.';
+            case 'Nitrogen':
+              return 'Para sa Nitrogen deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+                  '1. **Urea (46% N)** - Mataas na concentration ng nitrogen, mag-apply ng 100-200 kg/ektarya\n'
+                  '2. **Ammonium nitrate (34% N)** - Medyo mabilis na release, gamitin sa 150-250 kg/ektarya\n'
+                  '3. **Ammonium sulfate (21% N, 24% S)** - Nagbibigay din ng sulfur, mag-apply ng 200-300 kg/ektarya\n'
+                  '4. **NPK fertilizers na mataas sa N** - Tulad ng 20-5-10 o katulad na ratio\n\n'
+                  'Para sa organikong opsyon, gumamit ng compost, manure, o blood meal. Ang split application ng nitrogen ay mas maganda para sa saging para iwasan ang nutrient leaching.';
+            case 'Magnesium':
+              return 'Para sa Magnesium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+                  '1. **Magnesium sulfate (Epsom salt, 10% Mg, 13% S)** - Mag-apply ng 20-40 kg/ektarya\n'
+                  '2. **Dolomitic lime (6-12% Mg)** - Maganda kung acidic din ang lupa, mag-apply base sa soil test\n'
+                  '3. **Magnesium oxide (55-60% Mg)** - Para sa mabilis na correction, 10-15 kg/ektarya\n'
+                  '4. **Kieserite (15-17% Mg, 20-22% S)** - Medium release rate, 50-100 kg/ektarya\n\n'
+                  'Para sa foliar spray, gumamit ng 2% magnesium sulfate solution, i-spray tuwing 2-3 linggo hanggang sa mawala ang mga sintomas. Mag-ingat sa sobrang paglalagay ng potassium dahil maaaring makipag-compete ito sa magnesium.';
+            default:
+              return 'Para sa $deficiencyType deficiency, ang mga pinakamagandang pataba na pwedeng gamitin ay:\n\n'
+                  '1. **Espesyal na $deficiencyType fertilizers** - Maghanap ng mga produktong partikular na ginawa para sa deficiency na ito\n'
+                  '2. **Foliar sprays** - Para sa mabilis na pagwawasto, maghanap ng liquid fertilizer na may $deficiencyType\n'
+                  '3. **Organikong opsyon** - Compost na pinagyaman ng mga minerals o partikular na organikong amendments\n\n'
+                  'Ang eksaktong rate ng application ay depende sa kalubhaan ng deficiency at sa kondisyon ng iyong lupa. Para sa mas tumpak na rekomendasyon, magsagawa ng soil test at kumonsulta sa lokal na agricultural extension specialist.';
+          }
+        }
+
+        // Determine if this is a follow-up question
+        bool isFollowUp = _isFollowUpQuestion(question, isTagalog);
+        print('Is follow-up question: $isFollowUp');
+
+        // Parse conversation to determine what has already been discussed
+        bool discussedTreatment =
+            context.toLowerCase().contains('treatment:') ||
+                context.toLowerCase().contains('treatment recommendations') ||
+                context.toLowerCase().contains('how to treat');
+
+        bool discussedPrevention =
+            context.toLowerCase().contains('prevention:') ||
+                context.toLowerCase().contains('how to prevent') ||
+                context.toLowerCase().contains('prevention measures');
+
+        bool discussedCost = context.toLowerCase().contains('cost') ||
+            context.toLowerCase().contains('price') ||
+            context.toLowerCase().contains('expensive');
+
+        bool discussedTimeline = context.toLowerCase().contains('how long') ||
+            context.toLowerCase().contains('timeline') ||
+            context.toLowerCase().contains('when will');
+
+        // For genuine follow-up questions, provide more context-dependent answers
+        if (isFollowUp) {
+          print('Handling follow-up with improved context awareness');
+
+          // Special handling for short follow-up questions
+          if (question.length < 15) {
+            return _generateSupplementalInfo(deficiencyType, isTagalog);
+          }
+
+          // Look at the most recent parts of the conversation to provide continuity
+          final lines = context.split('\n');
+          String recentContext = "";
+
+          // Get the last 10 lines of context (or fewer if there aren't 10)
+          for (int i = max(0, lines.length - 10); i < lines.length; i++) {
+            recentContext += lines[i] + "\n";
+          }
+
+          // If asking about applying treatment after we've discussed it
+          if (discussedTreatment &&
+              (question.toLowerCase().contains('apply') ||
+                  question.toLowerCase().contains('how') ||
+                  question.toLowerCase().contains('step'))) {
+            if (isTagalog) {
+              return 'Para ma-apply ang treatment para sa $deficiencyType deficiency, sundin ang mga sumusunod na hakbang:\n\n'
+                  '1. Para sa soil application, ilagay ang recommended fertilizer sa palibot ng puno, mga 30-50cm mula sa ugat\n'
+                  '2. Haluin sa ibabaw na parte ng lupa (5-10cm ang lalim)\n'
+                  '3. Diligan kaagad pagkatapos para matunaw ang nutrients\n\n'
+                  'Para sa foliar spray:\n'
+                  '1. I-spray sa umaga o hapon (iwasan ang tanghaling tapat)\n'
+                  '2. Tiyaking matakpan ang lahat ng dahon, lalo na ang ilalim\n'
+                  '3. Ulitin ang pag-apply ayon sa rekomendasyon (karaniwang tuwing 2-4 na linggo)';
+            } else {
+              return 'To apply the treatment for $deficiencyType deficiency, follow these steps:\n\n'
+                  '1. For soil application, apply the recommended fertilizer around the plant, about 30-50cm from the trunk\n'
+                  '2. Work the fertilizer into the top 5-10cm of soil\n'
+                  '3. Water thoroughly immediately after application\n\n'
+                  'For foliar spray application:\n'
+                  '1. Apply during early morning or late afternoon (avoid hot midday sun)\n'
+                  '2. Ensure good coverage of all leaf surfaces, especially undersides\n'
+                  '3. Repeat application as recommended (usually every 2-4 weeks)';
+            }
+          }
+
+          // For simple follow-up questions or ones asking for more information
+          if (question.toLowerCase().contains('more') ||
+              question.toLowerCase().contains('detail') ||
+              question.toLowerCase().contains('explain') ||
+              question.toLowerCase().contains('what else') ||
+              question.length < 10) {
+            return _generateSupplementalInfo(deficiencyType, isTagalog);
+          }
+
+          // If asking for symptoms after discussing diagnosis
+          if (question.toLowerCase().contains('symptom') ||
+              question.toLowerCase().contains('sign') ||
+              question.toLowerCase().contains('look like')) {
+            switch (deficiencyType) {
+              case 'Calcium':
+                return 'Key symptoms of Calcium deficiency in banana plants include:\n\n'
+                    '• Young leaves show distorted growth and may be curled\n'
+                    '• Leaf margins may develop chlorosis (yellowing)\n'
+                    '• Growing points can become stunted\n'
+                    '• Fruits may develop "finger drop" where individual bananas separate from the bunch prematurely\n'
+                    '• Internal fruit quality can be poor with increased susceptibility to rot';
+              case 'Potassium':
+                return 'Key symptoms of Potassium deficiency in banana plants include:\n\n'
+                    '• Yellowing and necrosis (browning) starting from leaf margins and moving inward\n'
+                    '• Older leaves are affected first, showing a characteristic "scorched" appearance\n'
+                    '• Leaf tips may dry up and curl\n'
+                    '• Weak stems that are prone to snapping\n'
+                    '• Smaller bunches with irregular fruit filling';
+              default:
+                return 'The key symptoms of $deficiencyType deficiency in banana plants include changes in leaf color, specifically yellowing patterns, growth abnormalities, and reduced plant vigor. The specific pattern of discoloration and which leaves are affected first (older vs. newer) can help distinguish this deficiency from others.';
+            }
+          }
+        }
+
+        // For detailed questions about diagnosis, treatment, etc.
         return _generateContextualAnswer(
             deficiencyType, question, context, isTagalog);
       }
 
-      // For new conversations or when no deficiency is identified yet
-      String prompt;
-
-      // Create a better prompt that maintains context
-      if (context != null && context.isNotEmpty) {
-        // Use conversation history for context-aware responses
-        prompt = "Conversation history:\n$context\n\n"
-            "The farmer's banana plant has $deficiencyType deficiency. "
-            "Question: $question\n\n"
-            "${isTagalog ? 'Respond in Tagalog/Filipino language using professional but accessible language. Avoid overly casual language like \"naku pare\".' : 'Respond in English.'}\n"
-            "Important: Always acknowledge and reference the $deficiencyType deficiency that was already detected. "
-            "Don't ask for symptoms again if they were already provided. "
-            "Focus specifically on practical $deficiencyType deficiency treatment and management.";
-      } else {
-        prompt = "The farmer's banana plant has $deficiencyType deficiency. "
-            "Question: $question\n\n"
-            "${isTagalog ? 'Respond in Tagalog/Filipino language using professional but accessible language. Avoid overly casual language like \"naku pare\".' : 'Respond in English.'}\n"
-            "Important: Always acknowledge the $deficiencyType deficiency that was already detected. "
-            "Focus specifically on practical $deficiencyType deficiency treatment and management.";
-      }
-
-      // For now, let's simulate with a hardcoded response system
-      // In a real implementation, you would send the prompt to your LLM API
-      print('Generated prompt: $prompt');
-
-      // Check for simple action questions as a fallback
-      bool isSimpleActionQuestion =
-          _isSimpleActionQuestion(question, isTagalog);
-      if (deficiencyType.isNotEmpty && isSimpleActionQuestion) {
+      // Fall back to standard responses if no context
+      if (deficiencyType.isNotEmpty &&
+          _isSimpleActionQuestion(question, isTagalog)) {
         print('Simple action question detected, providing treatment answer');
         return _generateSpecificTreatmentAnswer(deficiencyType, isTagalog);
       }
@@ -148,6 +371,19 @@ class LLMService {
     bool hasAskedAboutCause = context.toLowerCase().contains('cause') ||
         context.toLowerCase().contains('sanhi') ||
         context.toLowerCase().contains('bakit');
+
+    // Check if asking about fertilizer specifically
+    bool isAskingAboutFertilizer =
+        question.toLowerCase().contains('fertilizer') ||
+            question.toLowerCase().contains('pataba') ||
+            question.toLowerCase().contains('abono') ||
+            question.toLowerCase().contains('anong klaseng pataba') ||
+            question.toLowerCase().contains('anong uri ng pataba');
+
+    if (isTagalog && isAskingAboutFertilizer) {
+      print('Detected Tagalog fertilizer question in contextual answer');
+      return _generateTagalogFertilizerAnswer(deficiency);
+    }
 
     // IMPROVED: Check for common follow-up patterns that indicate continuation of a conversation
     bool isFollowUpQuestion = _isFollowUpQuestion(question, isTagalog);
@@ -237,8 +473,8 @@ class LLMService {
             '2. Use balanced fertilizers with adequate $deficiency content\n'
             '3. Maintain proper soil pH for optimal nutrient absorption\n'
             '4. Monitor leaves for early signs of deficiency\n'
-            '5. Ensure proper irrigation as water stress affects nutrient uptake\n\n'
-            'Remember that prevention is easier than treating deficiencies once they become severe.';
+            '5. Ensure proper irrigation as water stress affects nutrient uptake\n'
+            '6. **Crop rotation** where applicable to balance soil nutrient use';
       }
 
       // If it's about the cause
@@ -522,68 +758,6 @@ class LLMService {
   }
 
   // Simulated responses for prototype
-  String _generateDeficiencyExplanation(String deficiency, double confidence) {
-    final String confidenceStr = '${(confidence * 100).toStringAsFixed(0)}';
-
-    // Check if we should use Filipino
-    bool useFilipino = currentLocale?.languageCode == 'tl';
-
-    final explanationsEnglish = {
-      'Sulphur':
-          'Your banana plants are showing signs of Sulphur deficiency ($confidenceStr% confidence). Sulphur is essential for protein synthesis and enzyme function. When deficient, younger leaves show uniform yellowing. The plant\'s growth becomes stunted, and fruiting may be delayed.',
-      'Potassium':
-          'Your banana plants are showing signs of Potassium deficiency ($confidenceStr% confidence). Potassium plays a key role in water regulation and sugar transport. Deficient plants show yellowing and scorching along leaf margins, starting with older leaves. Fruits may be smaller and have irregular ripening.',
-      'Magnesium':
-          'Your banana plants are showing signs of Magnesium deficiency ($confidenceStr% confidence). Magnesium is central to chlorophyll production. When deficient, leaves show interveinal chlorosis (yellowing between veins) while veins remain green, often with a Christmas tree pattern.',
-      'Boron':
-          'Your banana plants are showing signs of Boron deficiency ($confidenceStr% confidence). Boron affects cell wall structure and new growth. Deficiency causes deformed, bunched leaves and stunted growth at the top of the plant. Fruits may be deformed with "hard core" symptoms.',
-      'Calcium':
-          'Your banana plants are showing signs of Calcium deficiency ($confidenceStr% confidence). Calcium is crucial for cell wall development. Deficiency shows as chlorosis of leaf margins, distorted growth, and weakened structural integrity. Fruits may show premature ripening.',
-      'Iron':
-          'Your banana plants are showing signs of Iron deficiency ($confidenceStr% confidence). Iron is essential for chlorophyll synthesis. Deficient plants show distinct yellowing of young leaves with green veins. Severe cases can lead to completely pale or white young leaves.',
-      'Manganese':
-          'Your banana plants are showing signs of Manganese deficiency ($confidenceStr% confidence). Manganese affects photosynthesis and nitrogen metabolism. Symptoms appear as interveinal chlorosis on younger leaves, often with a fishbone or comb-like pattern.',
-      'Zinc':
-          'Your banana plants are showing signs of Zinc deficiency ($confidenceStr% confidence). Zinc is needed for growth hormone production. Deficiency causes small, narrow leaves clustered at shoot tips, creating a "rosette" appearance. Leaf veins often remain darker while leaf tissues yellow.',
-      'Healthy':
-          'Good news! Your banana plants appear healthy ($confidenceStr% confidence). The leaves show good coloration and no signs of nutrient deficiencies. Continue with your current management practices to maintain plant health.',
-    };
-
-    final explanationsFilipino = {
-      'Sulphur':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Sulphur ($confidenceStr% kumpiyansa). Ang Sulphur ay mahalaga para sa pagsasanth-esis ng protina at paggana ng enzymes. Kapag may kakulangan, ang mga nakakabatang dahon ay nagpapakita ng pantay na pagdilaw. Ang paglaki ng halaman ay nagiging mabagal, at maaaring maantala ang pamumulaklak.',
-      'Potassium':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Potassium ($confidenceStr% kumpiyansa). Ang Potassium ay may mahalagang papel sa regulasyon ng tubig at transportasyon ng asukal. Ang mga halamang may kakulangan ay nagpapakita ng pagdilaw at pagkasunog sa gilid ng dahon, nagsisimula sa mas matatandang dahon. Ang mga bunga ay maaaring mas maliit at may hindi pantay na paghinog.',
-      'Magnesium':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Magnesium ($confidenceStr% kumpiyansa). Ang Magnesium ay mahalaga para sa produksyon ng chlorophyll. Kapag may kakulangan, ang mga dahon ay nagpapakita ng interveinal chlorosis (pagdilaw sa pagitan ng mga ugat) habang ang mga ugat ay nananatiling berde, kadalasang may pattern na parang Christmas tree.',
-      'Boron':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Boron ($confidenceStr% kumpiyansa). Nakakaapekto ang Boron sa istraktura ng cell wall at bagong paglaki. Ang kakulangan ay nagiging sanhi ng deformado at nagbubukol na mga dahon at mabagal na paglaki sa tuktok ng halaman. Ang mga bunga ay maaaring deformado na may sintomas ng "hard core".',
-      'Calcium':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Calcium ($confidenceStr% kumpiyansa). Ang Calcium ay mahalaga para sa pagbuo ng cell wall. Ang kakulangan ay nagpapakita bilang chlorosis ng mga gilid ng dahon, distorted growth, at mahinang structural integrity. Ang mga bunga ay maaaring magpakita ng maagang paghinog.',
-      'Iron':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Iron ($confidenceStr% kumpiyansa). Ang Iron ay mahalaga para sa synthesis ng chlorophyll. Ang mga halamang may kakulangan ay nagpapakita ng malinaw na pagdilaw ng mga batang dahon na may berdeng ugat. Ang matinding kaso ay maaaring magresulta sa mga dahon na maputla o puting mga batang dahon.',
-      'Manganese':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Manganese ($confidenceStr% kumpiyansa). Nakakaapekto ang Manganese sa photosynthesis at metabolismo ng nitrogen. Ang mga sintomas ay lumalabas bilang interveinal chlorosis sa mga nakakabatang dahon, kadalasang may pattern na parang fishbone o suklay.',
-      'Zinc':
-          'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa Zinc ($confidenceStr% kumpiyansa). Ang Zinc ay kailangan para sa produksyon ng growth hormone. Ang kakulangan ay nagdudulot ng maliliit, makikitid na dahon na nakagrupo sa dulo ng shoot, na lumilikha ng "rosette" na hitsura. Ang mga ugat ng dahon ay kadalasang nananatiling mas maitim habang ang tisyu ng dahon ay dumidilaw.',
-      'Healthy':
-          'Mabuting balita! Ang iyong mga puno ng saging ay mukhang malusog ($confidenceStr% kumpiyansa). Ang mga dahon ay nagpapakita ng magandang kulay at walang palatandaan ng kakulangan sa sustansya. Ipagpatuloy ang iyong kasalukuyang mga gawain sa pamamahala upang mapanatili ang kalusugan ng halaman.',
-    };
-
-    final explanations =
-        useFilipino ? explanationsFilipino : explanationsEnglish;
-
-    if (explanations.containsKey(deficiency)) {
-      return explanations[deficiency]!;
-    } else {
-      if (useFilipino) {
-        return 'Ang iyong mga puno ng saging ay nagpapakita ng palatandaan ng kakulangan sa $deficiency. Nakita ito ng aming sistema na may $confidenceStr% kumpiyansa. Upang mapabuti ang kalusugan ng halaman, isaalang-alang ang pag-test ng lupa at target na pataba.';
-      } else {
-        return 'Your banana plants show signs of $deficiency deficiency. Our system detected this with $confidenceStr% confidence. To improve plant health, consider soil testing and targeted fertilization.';
-      }
-    }
-  }
-
   String _generateTreatmentRecommendation(String deficiency) {
     // Check if we should use Filipino
     bool useFilipino = currentLocale?.languageCode == 'tl';
@@ -821,12 +995,13 @@ class LLMService {
     if (question.toLowerCase().contains('magkano') ||
         question.toLowerCase().contains('presyo') ||
         question.toLowerCase().contains('halaga') ||
-        question.toLowerCase().contains('gastos')) {
+        question.toLowerCase().contains('gastos') ||
+        question.toLowerCase().contains('budget')) {
       return 'Ang halaga ng paggamot ng $deficiency deficiency ay depende sa:\n\n'
           '1. Kalubhaan ng kakulangan\n'
           '2. Laki ng iyong sakahan\n'
           '3. Availability ng produkto sa inyong lugar\n\n'
-          'Para sa maliit na sakahan (1-2 ektarya), mag-budget ng humigit-kumulang P5,000-10,000 kada ektarya para sa mga pataba. Ang foliar spray ay mas cost-effective sa maikling panahon, habang ang soil amendments ay nagbibigay ng mas matagal na resulta.';
+          'Para sa maliit na sakahan, mag-budget ng humigit-kumulang P5,000-10,000 kada ektarya para sa mga pataba. Ang foliar spray ay mas cost-effective sa maikling panahon, habang ang soil amendments ay nagbibigay ng mas matagal na resulta.';
     }
 
     // Default Tagalog response
@@ -838,12 +1013,40 @@ class LLMService {
         'Tandaan na ang consistency ay mahalaga sa paggamot ng nutrient deficiencies. Ang balanced na fertilization program ay makakatulong para maiwasan ang mga problema sa hinaharap.';
   }
 
-  // New method to detect if a question is a follow-up to a previous conversation
+  // Improved follow-up detection method
   bool _isFollowUpQuestion(String question, bool isTagalog) {
     question = question.toLowerCase().trim();
 
     // Very short questions are almost always follow-ups in context
-    if (question.length < 10) {
+    if (question.length < 15) {
+      return true;
+    }
+
+    // Check for specific question types that are typically follow-ups
+    if (_isTimelineQuestion(question, isTagalog) ||
+        question.contains("how long") ||
+        question.contains("when will") ||
+        question.contains("what fertilizer") ||
+        question.contains("what should i use") ||
+        question.contains("what to do") ||
+        question.contains("what is best way") ||
+        question.contains("best way") ||
+        question.contains("how to fix") ||
+        question.contains("how can i treat") ||
+        question.contains("how can i fix") ||
+        question.contains("what next") ||
+        question.contains("next step")) {
+      return true;
+    }
+
+    // Check for questions asking for more details
+    if (question.contains("more") ||
+        question.contains("else") ||
+        question.contains("another") ||
+        question.contains("other") ||
+        question.contains("further") ||
+        question.contains("additional") ||
+        question.contains("explain")) {
       return true;
     }
 
@@ -870,7 +1073,9 @@ class LLMService {
         'paano ang',
         'pano',
         'ano na',
-        'e di'
+        'e di',
+        'gaano katagal',
+        'kailan'
       ];
 
       for (String pattern in followUpPatterns) {
@@ -904,7 +1109,13 @@ class LLMService {
         'what about',
         'how about',
         'is that all',
-        'that\'s it'
+        'that\'s it',
+        'how long',
+        'when will',
+        'why',
+        'reason',
+        'cause',
+        'because'
       ];
 
       for (String pattern in followUpPatterns) {
@@ -917,5 +1128,213 @@ class LLMService {
     }
 
     return false;
+  }
+
+  // Generate cost-related response
+  String _generateCostResponse(String deficiency, bool isTagalog) {
+    if (isTagalog) {
+      switch (deficiency) {
+        case 'Calcium':
+          return 'Para sa Calcium deficiency treatment, ang halagang kakailanganin mo ay nasa pagitan ng:\n\n'
+              '- Calcium nitrate: ₱500-800 kada sako (25kg), sapat na para sa 0.25-0.5 ektarya\n'
+              '- Agricultural lime: ₱200-400 kada sako (40kg), para sa pH adjustment at calcium\n'
+              '- Calcium foliar spray: ₱300-600 kada litro ng concentrate\n\n'
+              'Para sa maliit na sakahan, ang total na gastos ay maaaring nasa ₱1,500-3,000 depende sa kalubhaan ng problema at laki ng iyong taniman. Mas cost-effective na gamutin nang maaga kaysa hintayin pang lumala ang kakulangan.';
+        case 'Sulphur':
+          return 'Para sa Sulphur deficiency treatment, ang gastusin ay humigit-kumulang:\n\n'
+              '- Ammonium sulphate: ₱600-900 kada sako (50kg), sapat para sa 0.5 ektarya\n'
+              '- Elemental sulphur: ₱400-700 kada sako (25kg)\n'
+              '- Gypsum (calcium sulphate): ₱250-450 kada sako (40kg)\n\n'
+              'Para sa karaniwang sakahan, ang budget na ₱2,000-4,000 ay sapat na para sa paggamot. Kadalasan, hindi kailangan ng madalas na pag-apply ng sulphur kaya ito ay isang cost-effective na investment para sa kalusugan ng iyong mga puno ng saging.';
+        default:
+          return 'Para sa $deficiency deficiency treatment, ang karaniwang gastusin ay:\n\n'
+              '- Commercial fertilizers: ₱500-1,200 kada sako depende sa formulation\n'
+              '- Foliar sprays: ₱300-800 kada litro ng concentrate\n'
+              '- Organic amendments: ₱200-500 kada sako\n\n'
+              'Para sa isang maliit na sakahan (0.5-1 ektarya), ang kabuuang budget na ₱2,000-5,000 ay makakatulong na para maayos ang deficiency. Mas makakatipid ka sa long run kung gagawin mo ang regular na soil testing at balanced fertilization para maiwasan ang deficiency sa hinaharap.';
+      }
+    } else {
+      switch (deficiency) {
+        case 'Calcium':
+          return 'For treating Calcium deficiency, here\'s a breakdown of approximate costs:\n\n'
+              '- Calcium nitrate: \$10-15 per 25kg bag, enough for 0.25-0.5 hectare\n'
+              '- Agricultural lime: \$4-8 per 40kg bag for pH adjustment and calcium\n'
+              '- Calcium foliar spray: \$6-12 per liter of concentrate\n\n'
+              'For a small farm, total costs would range from \$30-60 depending on severity and plantation size. Early treatment is more cost-effective than waiting until deficiency symptoms are severe.';
+        case 'Potassium':
+          return 'For Potassium deficiency treatment, the costs typically include:\n\n'
+              '- Potassium sulfate (SOP): \$15-25 per 25kg bag\n'
+              '- Potassium chloride (MOP): \$12-20 per 25kg bag\n'
+              '- Potassium nitrate foliar spray: \$8-15 per liter\n\n'
+              'For a typical banana plantation, budget around \$40-80 per hectare for treatment. This is a worthwhile investment as potassium directly affects fruit quality and yield, providing good return on investment through improved harvest.';
+        default:
+          return 'For $deficiency deficiency treatment, typical costs include:\n\n'
+              '- Commercial fertilizers: \$10-25 per bag depending on formulation\n'
+              '- Foliar sprays: \$6-16 per liter of concentrate\n'
+              '- Organic amendments: \$4-10 per bag\n\n'
+              'For a small plantation (0.5-1 hectare), a total budget of \$40-100 should address the deficiency. You\'ll save money in the long run by doing regular soil testing and balanced fertilization to prevent deficiencies from occurring.';
+      }
+    }
+  }
+
+  /// Generate supplemental information for follow-up questions
+  String _generateSupplementalInfo(String deficiency, bool isTagalog) {
+    if (isTagalog) {
+      switch (deficiency) {
+        case 'Calcium':
+          return 'Karagdagang impormasyon tungkol sa Calcium deficiency:\n\n'
+              '- Epekto sa ani: Maaaring bumaba ang kalidad ng bunga at bilis ng paglaki\n'
+              '- Pinakamainam na oras para mag-apply: Bago ang panahon ng malakas na paglaki\n'
+              '- Kaugnayan sa iba pang nutrients: Magkakaroon ng balance problem kung sobra ang potassium o magnesium\n'
+              '- Mga warning signs: Pagkagulong ng bagong dahon, pagkahinto ng paglaki ng dulo\n\n'
+              'Mahalaga rin na i-monitor ang pH ng lupa dahil nakakaapekto ito sa availability ng calcium.';
+        default:
+          return 'Karagdagang impormasyon tungkol sa $deficiency deficiency:\n\n'
+              '- Epekto sa ani: Maaaring magkaroon ng mas maliit o mababang kalidad na bunga\n'
+              '- Pag-monitor: Regular na inspeksyon ng mga dahon para sa maagang detection\n'
+              '- Pag-iwas: Balanced na fertilization program\n'
+              '- Pagsusuri: Maaaring magpa-soil test taun-taon para sa optimal na pamamahala\n\n'
+              'Tandaan na ang mga nutritional requirements ng saging ay nagbabago depende sa yugto ng paglaki nito.';
+      }
+    } else {
+      switch (deficiency) {
+        case 'Calcium':
+          return 'Additional information about Calcium deficiency:\n\n'
+              '- Impact on yield: Can reduce fruit quality and growth rate\n'
+              '- Best timing for application: Before periods of rapid growth\n'
+              '- Interaction with other nutrients: Can be imbalanced if potassium or magnesium is excessive\n'
+              '- Warning signs: Curling of new leaves, stunted growing points\n\n'
+              'It\'s also important to monitor soil pH as it affects calcium availability.';
+        default:
+          return 'Additional information about $deficiency deficiency:\n\n'
+              '- Impact on yield: Can result in smaller or lower quality fruit\n'
+              '- Monitoring: Regular leaf inspection for early detection\n'
+              '- Prevention: Balanced fertilization program\n'
+              '- Testing: Consider annual soil tests for optimal management\n\n'
+              'Keep in mind that banana nutritional requirements change throughout growth stages.';
+      }
+    }
+  }
+
+  /// Check if a question is asking about cost
+  bool _isCostQuestion(String question, bool isTagalog) {
+    question = question.toLowerCase().trim();
+
+    if (isTagalog) {
+      return question.contains('magkano') ||
+          question.contains('presyo') ||
+          question.contains('halaga') ||
+          question.contains('gastos') ||
+          question.contains('budget') ||
+          question.contains('mahal') ||
+          question.contains('mura');
+    } else {
+      return question.contains('cost') ||
+          question.contains('price') ||
+          question.contains('expensive') ||
+          question.contains('cheap') ||
+          question.contains('afford') ||
+          question.contains('money') ||
+          question.contains('budget') ||
+          question.contains('how much');
+    }
+  }
+
+  /// Check if a question is asking for confirmation
+  bool _isConfirmationQuestion(String question, bool isTagalog) {
+    question = question.toLowerCase().trim();
+
+    if (isTagalog) {
+      return question.contains('talaga') ||
+          question.contains('totoo') ||
+          question.contains('sigurado') ||
+          question.contains('ganun ba') ||
+          question.contains('tama ba');
+    } else {
+      return question.contains('really') ||
+          question.contains('true') ||
+          question.contains('sure') ||
+          question.contains('right') ||
+          question.contains('correct') ||
+          question.contains('actually');
+    }
+  }
+
+  /// Check if a question is asking about timeline or duration
+  bool _isTimelineQuestion(String question, bool isTagalog) {
+    question = question.toLowerCase().trim();
+
+    if (isTagalog) {
+      return question.contains('kailan') ||
+          question.contains('gaano katagal') ||
+          question.contains('ilang araw') ||
+          question.contains('ilang linggo') ||
+          question.contains('ilang buwan');
+    } else {
+      return question.contains('when') ||
+          question.contains('how long') ||
+          question.contains('timeline') ||
+          question.contains('how soon') ||
+          question.contains('how many days') ||
+          question.contains('how many weeks') ||
+          question.contains('how many months');
+    }
+  }
+
+  // Check if a question is asking about fertilizer in Tagalog
+  bool _isTagalogFertilizerQuestion(String question) {
+    return question.toLowerCase().contains("pataba") ||
+        question.toLowerCase().contains("abono") ||
+        question.toLowerCase().contains("anong klaseng pataba") ||
+        question.toLowerCase().contains("anong uri ng pataba") ||
+        question.toLowerCase().contains("ano ang pataba") ||
+        question.toLowerCase().contains("fertilizer");
+  }
+
+  // For contextual questions in Tagalog about fertilizer
+  String _generateTagalogFertilizerAnswer(String deficiencyType) {
+    switch (deficiencyType) {
+      case 'Calcium':
+        return 'Para sa Calcium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Calcium nitrate (15.5% N, 19% Ca)** - Mabilis kumilos na source ng calcium, mag-apply ng 2-5 kg bawat ektarya\n'
+            '2. **Calcium sulfate (Gypsum, 22% Ca)** - Mas mabagal na release, mainam para sa soil application sa 500-1000 kg bawat ektarya\n'
+            '3. **Dolomitic lime (Calcium Magnesium Carbonate)** - Para sa acidic na lupa, 1-2 toneladang bawat ektarya depende sa pH ng lupa\n'
+            '4. **Calcium chelate** - Para sa foliar spray, gamitin sa 2-3 g/L concentration\n\n'
+            'Para sa agarang resulta, gumamit ng foliar spray na may calcium chloride (2% solution). Para sa pangmatagalang solusyon, isama ang gypsum o lime sa lupa. Laging sundin ang mga tagubilin sa produkto para sa eksaktong rate ng application.';
+      case 'Potassium':
+        return 'Para sa Potassium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Potassium sulfate (SOP, 50% K₂O)** - Mas mababang salt index, angkop para sa saging sa 300-500 kg/ektarya\n'
+            '2. **Potassium chloride (MOP, 60% K₂O)** - Mas abot-kayang opsyon, gamitin sa 250-400 kg/ektarya\n'
+            '3. **Potassium nitrate (13% N, 44% K₂O)** - Mabilis na pagsipsip, mainam para sa foliar application sa 2-3% solution\n'
+            '4. **NPK fertilizers na mataas sa K** - Tulad ng 13-0-46 o katulad na ratio\n\n'
+            'Para sa agarang resulta, mag-apply ng potassium nitrate bilang foliar spray. Para sa pangmatagalang pangangalaga, gumamit ng potassium sulfate dahil naglalaman din ito ng sulfur. Iwasan ang sobrang paglalagay ng magnesium fertilizer dahil nakikipagkompetensya ito sa pagsipsip ng potassium.';
+      case 'Sulphur':
+        return 'Para sa Sulphur deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Elemental sulphur** - Mabagal na release, 90-99% S, mag-apply ng 20-30 kg/ektarya\n'
+            '2. **Ammonium sulphate** - 24% S at 21% N, mag-apply ng 100-200 kg/ektarya\n'
+            '3. **Potassium sulphate** - 18% S at 50% K₂O, mainam kung parehong nutrients ang kailangan\n'
+            '4. **Gypsum (Calcium sulphate)** - 13-18% S at 22% Ca, mag-apply ng 200-300 kg/ektarya\n\n'
+            'Ang elemental sulphur ay nangangailangan ng panahon para maging available sa halaman, kaya ang ammonium sulphate o potassium sulphate ay mas mainam para sa mas mabilis na resulta. Ang foliar sprays na may sulphate ay makakapagbigay ng mabilis na pagwawasto ng mga sintomas.';
+      case 'Nitrogen':
+        return 'Para sa Nitrogen deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Urea (46% N)** - Mataas na concentration ng nitrogen, mag-apply ng 100-200 kg/ektarya\n'
+            '2. **Ammonium nitrate (34% N)** - Medyo mabilis na release, gamitin sa 150-250 kg/ektarya\n'
+            '3. **Ammonium sulfate (21% N, 24% S)** - Nagbibigay din ng sulfur, mag-apply ng 200-300 kg/ektarya\n'
+            '4. **NPK fertilizers na mataas sa N** - Tulad ng 20-5-10 o katulad na ratio\n\n'
+            'Para sa organikong opsyon, gumamit ng compost, manure, o blood meal. Ang split application ng nitrogen ay mas maganda para sa saging para iwasan ang nutrient leaching.';
+      case 'Magnesium':
+        return 'Para sa Magnesium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Magnesium sulfate (Epsom salt, 10% Mg, 13% S)** - Mag-apply ng 20-40 kg/ektarya\n'
+            '2. **Dolomitic lime (6-12% Mg)** - Maganda kung acidic din ang lupa, mag-apply base sa soil test\n'
+            '3. **Magnesium oxide (55-60% Mg)** - Para sa mabilis na correction, 10-15 kg/ektarya\n'
+            '4. **Kieserite (15-17% Mg, 20-22% S)** - Medium release rate, 50-100 kg/ektarya\n\n'
+            'Para sa foliar spray, gumamit ng 2% magnesium sulfate solution, i-spray tuwing 2-3 linggo hanggang sa mawala ang mga sintomas. Mag-ingat sa sobrang paglalagay ng potassium dahil maaaring makipag-compete ito sa magnesium.';
+      default:
+        return 'Para sa $deficiencyType deficiency, ang mga pinakamagandang pataba na pwedeng gamitin ay:\n\n'
+            '1. **Espesyal na $deficiencyType fertilizers** - Maghanap ng mga produktong partikular na ginawa para sa deficiency na ito\n'
+            '2. **Foliar sprays** - Para sa mabilis na pagwawasto, maghanap ng liquid fertilizer na may $deficiencyType\n'
+            '3. **Organikong opsyon** - Compost na pinagyaman ng mga minerals o partikular na organikong amendments\n\n'
+            'Ang eksaktong rate ng application ay depende sa kalubhaan ng deficiency at sa kondisyon ng iyong lupa. Para sa mas tumpak na rekomendasyon, magsagawa ng soil test at kumonsulta sa lokal na agricultural extension specialist.';
+    }
   }
 }

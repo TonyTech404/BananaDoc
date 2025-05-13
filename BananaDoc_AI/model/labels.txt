@@ -1,0 +1,8 @@
+Healthy
+Nitrogen
+Phosphorus
+Potassium
+Calcium
+Magnesium
+Sulphur
+Iron

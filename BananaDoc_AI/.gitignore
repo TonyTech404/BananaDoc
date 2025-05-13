@@ -21,16 +21,22 @@ var/
 *.egg
 venv/
 
-# TensorFlow model files
+# TensorFlow model files - but allow our specific models
 *.h5
+!model/banana_nutrient_model.h5
 *.tflite
+!model/banana_nutrient_model.tflite
+!model/banana_mobile_model.tflite
 *.pb
 *.ckpt.*
 *.ckpt
 checkpoint
 
-# Training outputs
+# Training outputs - but allow our specific outputs
 training_history.png
+!model/training_history.png
+!model/prediction_distribution.png
+!model/model_comparison.png
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -43,6 +49,10 @@ training_history.png
 *.bmp
 *.tif
 *.tiff
+# But allow specific model-related images
+!model/training_history.png
+!model/prediction_distribution.png
+!model/model_comparison.png
 
 # Flask stuff:
 instance/

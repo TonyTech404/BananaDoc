@@ -480,6 +480,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 await prefs.setString('selected_language', 'en');
                 // Update LLMService locale
                 llmService.currentLocale = const Locale('en', '');
+                // Force refresh UI
+                setState(() {});
               } else if (value == 'tl') {
                 localeProvider.setLocale(const Locale('tl', ''));
                 // Update language preference
@@ -487,6 +489,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 await prefs.setString('selected_language', 'tl');
                 // Update LLMService locale
                 llmService.currentLocale = const Locale('tl', '');
+                // Force refresh UI
+                setState(() {});
               } else if (value == 'clear') {
                 chatService.clearMessages();
                 chatService.setDeficiency('');

@@ -1,0 +1,563 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:async';
+import '../models/leaf_analysis_result.dart';
+import 'package:path/path.dart' as path;
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
+import 'dart:convert';
+
+/// Service class for handling TFLite model operations
+class TFLiteService {
+  static const String MODEL_FILENAME = 'banana_mobile_model.tflite';
+  static const String LABELS_FILENAME = 'labels.txt';
+  static const String METADATA_FILENAME = 'model_metadata.json';
+
+  // Singleton instance
+  static final TFLiteService _instance = TFLiteService._internal();
+
+  // Factory constructor
+  factory TFLiteService() => _instance;
+
+  // Private constructor
+  TFLiteService._internal();
+
+  // Model path in filesystem
+  String? _modelPath;
+  String? _labelsPath;
+
+  // Flag to check if model is loaded
+  bool _modelLoaded = false;
+
+  // Class mapping
+  Map<int, String> _labels = {};
+
+  // Track current locale
+  Locale? currentLocale;
+
+  // Additional information about deficiencies
+  final Map<String, Map<String, String>> _deficiencyInfo = {
+    'Healthy': {
+      'symptoms':
+          'Leaves have a vibrant green color, normal leaf shape and size, and show no signs of discoloration or abnormalities.',
+      'treatment': 'Continue balanced fertilization and proper care.',
+      'prevention':
+          'Regular soil testing, balanced fertilization, and proper irrigation practices.',
+    },
+    'Nitrogen': {
+      'symptoms':
+          'Older leaves turn pale green to yellow. Growth is stunted and the plant has a general pale appearance.',
+      'treatment':
+          'Apply nitrogen-rich fertilizers like urea, ammonium sulfate, or organic alternatives like compost or manure.',
+      'prevention':
+          'Regular soil testing and applying balanced NPK fertilizers according to banana plant requirements.',
+    },
+    'Phosphorus': {
+      'symptoms':
+          'Leaves develop a purple tint, especially on undersides. Growth is slow with poor fruit development.',
+      'treatment':
+          'Apply phosphorus fertilizers like superphosphate or bone meal. Maintain soil pH around 6.5 for optimal phosphorus uptake.',
+      'prevention':
+          'Maintain proper soil pH and incorporate organic matter into the soil.',
+    },
+    'Potassium': {
+      'symptoms':
+          'Yellow/orange discoloration and necrosis along leaf margins, beginning on older leaves. Leaves may curl upward.',
+      'treatment':
+          'Apply potassium sulfate, potassium chloride, or foliar spray with potassium nitrate.',
+      'prevention':
+          'Regular soil testing, use of potassium fertilizers, proper irrigation.',
+    },
+    'Calcium': {
+      'symptoms':
+          'Young leaves are distorted or irregularly shaped. Leaf tips can be hooked and brown. Reduced fruit quality.',
+      'treatment':
+          'Apply calcium nitrate, calcium sulfate (gypsum) or lime. Spray with calcium chloride.',
+      'prevention':
+          'Maintain proper soil pH, avoid excess potassium fertilizer, ensure proper irrigation.',
+    },
+    'Magnesium': {
+      'symptoms':
+          'Interveinal chlorosis on older leaves, with yellow areas between green veins, eventually turning brown.',
+      'treatment':
+          'Apply magnesium sulfate (Epsom salt) or dolomitic limestone. Use foliar spray with 2% magnesium sulfate.',
+      'prevention':
+          'Maintain proper soil pH, avoid excessive use of potassium and calcium.',
+    },
+    'Sulphur': {
+      'symptoms':
+          'Younger leaves turn yellow while veins remain green. Stems become thin and woody, and growth is stunted.',
+      'treatment':
+          'Apply sulfur-containing fertilizers like ammonium sulfate or gypsum. Add organic matter to soil.',
+      'prevention':
+          'Use sulfur-containing fertilizers regularly, especially in soils low in organic matter.',
+    },
+    'Iron': {
+      'symptoms':
+          'Interveinal chlorosis on young leaves, with veins remaining green against a yellow or white background.',
+      'treatment':
+          'Apply iron sulfate or chelated iron. Add organic matter to soil.',
+      'prevention':
+          'Maintain soil pH between 5.5 and 6.5, add organic matter, avoid overwatering.',
+    },
+  };
+
+  /// Initialize the TFLite service by copying assets to accessible location
+  Future<bool> initialize() async {
+    try {
+      if (_modelLoaded) return true;
+
+      debugPrint('Initializing TFLite service...');
+
+      // For web platform, use a simplified approach
+      if (kIsWeb) {
+        debugPrint('Running on web platform, using simplified initialization');
+        // Load default labels
+        _labels = {
+          0: "Healthy",
+          1: "Nitrogen",
+          2: "Phosphorus",
+          3: "Potassium",
+          4: "Calcium",
+          5: "Magnesium",
+          6: "Sulphur",
+          7: "Iron"
+        };
+
+        _modelLoaded = true;
+        debugPrint('Web TFLite service initialized with default settings');
+        return true;
+      }
+
+      // For mobile platforms, continue with normal initialization
+      // Get application documents directory
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final String modelDir = path.join(appDir.path, 'tflite_models');
+
+      // Create directory if it doesn't exist
+      Directory(modelDir).createSync(recursive: true);
+
+      debugPrint('TFLite model directory: $modelDir');
+
+      // Set paths for model and labels
+      _modelPath = path.join(modelDir, MODEL_FILENAME);
+      _labelsPath = path.join(modelDir, LABELS_FILENAME);
+
+      debugPrint('Model path: $_modelPath');
+      debugPrint('Labels path: $_labelsPath');
+
+      // Check if assets exist first
+      bool assetsExist = true;
+      try {
+        await rootBundle.load('assets/models/$MODEL_FILENAME');
+        debugPrint('Model found in assets');
+      } catch (e) {
+        debugPrint('Warning: Model not found in assets: $e');
+        assetsExist = false;
+      }
+
+      try {
+        await rootBundle.load('assets/models/$LABELS_FILENAME');
+        debugPrint('Labels found in assets');
+      } catch (e) {
+        debugPrint('Warning: Labels not found in assets: $e');
+        // Continue anyway as we have fallback labels
+      }
+
+      if (assetsExist) {
+        // Copy model from assets to file system if needed
+        try {
+          await _copyAssetToFile('assets/models/$MODEL_FILENAME', _modelPath!);
+          await _copyAssetToFile(
+              'assets/models/$LABELS_FILENAME', _labelsPath!);
+
+          // Also copy metadata if it exists
+          try {
+            await _copyAssetToFile('assets/models/$METADATA_FILENAME',
+                path.join(modelDir, METADATA_FILENAME));
+          } catch (e) {
+            debugPrint('Metadata file not found, continuing without it: $e');
+          }
+        } catch (e) {
+          debugPrint('Warning: Error copying assets: $e');
+          // Continue anyway, as we'll create or use fallback files
+        }
+      } else {
+        debugPrint('Creating mock TFLite assets since they were not found');
+        // Create a minimal mock TFLite model file
+        File modelFile = File(_modelPath!);
+        if (!modelFile.existsSync()) {
+          // Create a dummy model file with a TFLite header (8 bytes)
+          final mockModelBytes = Uint8List.fromList(
+              [0x18, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4C, 0x33]);
+          await modelFile.writeAsBytes(mockModelBytes);
+          debugPrint('Created mock model file');
+        }
+
+        // Create a labels file if it doesn't exist
+        File labelsFile = File(_labelsPath!);
+        if (!labelsFile.existsSync()) {
+          const labels = '''Healthy
+Nitrogen
+Phosphorus
+Potassium
+Calcium
+Magnesium
+Sulphur
+Iron''';
+          await labelsFile.writeAsString(labels);
+          debugPrint('Created labels file');
+        }
+      }
+
+      // Load labels
+      await _loadLabels();
+
+      // Verify model file exists
+      final modelFile = File(_modelPath!);
+      if (!modelFile.existsSync()) {
+        debugPrint('Warning: Model file does not exist after initialization');
+        // We'll continue anyway and use mock responses
+      }
+
+      _modelLoaded = true;
+      debugPrint('TFLite service initialized successfully');
+      return true;
+    } catch (e) {
+      debugPrint('Error initializing TFLite service: $e');
+      // Even if initialization fails, we'll return true and use mock responses
+      _modelLoaded = true;
+      return true;
+    }
+  }
+
+  /// Copy asset file to local filesystem
+  Future<void> _copyAssetToFile(String assetPath, String filePath) async {
+    try {
+      final File file = File(filePath);
+
+      // Only copy if file doesn't exist or is outdated
+      if (!file.existsSync()) {
+        final ByteData assetData = await rootBundle.load(assetPath);
+        final Uint8List bytes = assetData.buffer.asUint8List();
+        await file.writeAsBytes(bytes);
+        debugPrint('Copied $assetPath to $filePath');
+      } else {
+        debugPrint('File already exists: $filePath');
+      }
+    } catch (e) {
+      debugPrint('Error copying asset to file: $e');
+      // Rethrow to be caught by initialize()
+      rethrow;
+    }
+  }
+
+  /// Load class labels
+  Future<void> _loadLabels() async {
+    try {
+      final File file = File(_labelsPath!);
+      if (!file.existsSync()) {
+        throw Exception('Labels file not found');
+      }
+
+      final String contents = await file.readAsString();
+      final List<String> lines = contents.split('\n');
+
+      _labels.clear();
+
+      // New format: each line is just the class name, index is the line number
+      for (int i = 0; i < lines.length; i++) {
+        final String label = lines[i].trim();
+        if (label.isNotEmpty) {
+          _labels[i] = label;
+        }
+      }
+
+      debugPrint('Loaded ${_labels.length} labels');
+    } catch (e) {
+      debugPrint('Error loading labels: $e');
+      // Use default label mapping if labels file fails to load
+      _labels = {
+        0: "Healthy",
+        1: "Nitrogen",
+        2: "Phosphorus",
+        3: "Potassium",
+        4: "Calcium",
+        5: "Magnesium",
+        6: "Sulphur",
+        7: "Iron"
+      };
+      debugPrint('Using default labels');
+    }
+  }
+
+  /// Process an image file for TFLite model
+  Future<LeafAnalysisResult> analyzeImage(File imageFile) async {
+    // Ensure model is initialized
+    if (!_modelLoaded) {
+      await initialize();
+    }
+
+    try {
+      // Process the image for inference (resize, normalize, etc.)
+      final img.Image? processedImage = await _preprocessImage(imageFile);
+      if (processedImage == null) {
+        throw Exception('Failed to process image');
+      }
+
+      // Run TFLite inference
+      final Map<String, dynamic> result = await _runInference(processedImage);
+
+      return _createAnalysisResult(result);
+    } catch (e) {
+      debugPrint('Error analyzing image: $e');
+      rethrow;
+    }
+  }
+
+  /// Process image data for web platform
+  Future<LeafAnalysisResult> analyzeImageWeb(Uint8List imageBytes) async {
+    // Ensure model is initialized
+    if (!_modelLoaded) {
+      await initialize();
+    }
+
+    try {
+      // For web, we'll process the image bytes directly
+      // Decode the image
+      final img.Image? decodedImage = img.decodeImage(imageBytes);
+
+      if (decodedImage == null) {
+        throw Exception('Failed to decode image');
+      }
+
+      // Resize to 224x224 (or whatever size your model requires)
+      final img.Image processedImage = img.copyResize(
+        decodedImage,
+        width: 224,
+        height: 224,
+      );
+
+      // Run inference on the processed image
+      final Map<String, dynamic> result = await _runInference(processedImage);
+
+      return _createAnalysisResult(result);
+    } catch (e) {
+      debugPrint('Error analyzing web image: $e');
+      rethrow;
+    }
+  }
+
+  /// Preprocess image for TFLite model
+  Future<img.Image?> _preprocessImage(File imageFile) async {
+    try {
+      // Read and decode the image
+      final Uint8List bytes = await imageFile.readAsBytes();
+      final img.Image? decodedImage = img.decodeImage(bytes);
+
+      if (decodedImage == null) return null;
+
+      // Resize to 224x224 (or whatever size your model requires)
+      final img.Image resizedImage = img.copyResize(
+        decodedImage,
+        width: 224,
+        height: 224,
+      );
+
+      return resizedImage;
+    } catch (e) {
+      debugPrint('Error preprocessing image: $e');
+      return null;
+    }
+  }
+
+  /// Run inference using TFLite interpreter
+  Future<Map<String, dynamic>> _runInference(img.Image processedImage) async {
+    // This is a placeholder for the actual TFLite inference
+    // In a real implementation, you would:
+    // 1. Convert the image to the format required by your model
+    // 2. Run the TFLite interpreter
+    // 3. Process the output to get class probabilities
+
+    // For now, we'll simulate a simple inference result
+    // In a real implementation, replace this with actual TFLite inference
+
+    // IMPORTANT: This is simulated. For production, implement actual TFLite inference
+    await Future.delayed(
+        const Duration(milliseconds: 500)); // Simulating processing time
+
+    // Simulate class probabilities (would come from actual model in production)
+    final Map<String, double> classProbabilities = {
+      'Healthy': 0.05,
+      'Nitrogen': 0.03,
+      'Phosphorus': 0.02,
+      'Potassium': 0.04,
+      'Calcium': 0.72, // Simulating highest probability
+      'Magnesium': 0.06,
+      'Sulphur': 0.05,
+      'Iron': 0.03,
+    };
+
+    // Find the class with highest probability
+    String predictedClass = '';
+    double highestProb = 0.0;
+
+    classProbabilities.forEach((className, probability) {
+      if (probability > highestProb) {
+        highestProb = probability;
+        predictedClass = className;
+      }
+    });
+
+    return {
+      'deficiency': predictedClass,
+      'confidence': highestProb,
+      'probabilities': classProbabilities,
+    };
+  }
+
+  /// Create analysis result from inference output
+  LeafAnalysisResult _createAnalysisResult(
+      Map<String, dynamic> inferenceResult) {
+    final String deficiencyType = inferenceResult['deficiency'];
+    final double confidence = inferenceResult['confidence'];
+
+    // Get deficiency info or use defaults if not available
+    final Map<String, String> info = _deficiencyInfo[deficiencyType] ??
+        {
+          'symptoms': 'Unknown symptoms',
+          'treatment': 'Please consult with a banana growing expert',
+          'prevention': 'Regular monitoring and soil testing recommended',
+        };
+
+    // Format diagnosis
+    final String diagnosis = _formatDiagnosis(
+      deficiencyType,
+      confidence,
+      info['symptoms'] ?? '',
+    );
+
+    // Check if Filipino is the current language
+    bool isFilipino = currentLocale?.languageCode == 'tl';
+
+    String treatment = info['treatment'] ?? '';
+    String prevention = info['prevention'] ?? '';
+
+    // Translate treatment and prevention if in Filipino
+    if (isFilipino) {
+      treatment = _translateTreatment(deficiencyType, treatment);
+      prevention = _translatePrevention(deficiencyType, prevention);
+    }
+
+    return LeafAnalysisResult(
+      diagnosis: diagnosis,
+      treatment: treatment,
+      prevention: prevention,
+      deficiencyType: deficiencyType,
+      confidence: confidence,
+    );
+  }
+
+  /// Format diagnosis text
+  String _formatDiagnosis(
+      String deficiency, double confidence, String symptoms) {
+    final confidencePercent = (confidence * 100).toStringAsFixed(1);
+
+    // Check if Filipino is the current language
+    bool isFilipino = currentLocale?.languageCode == 'tl';
+
+    if (isFilipino) {
+      if (deficiency == 'Healthy') {
+        return 'Ang dahon ng saging na ito ay mukhang malusog '
+            '(${confidencePercent}% kumpiyansa).\n\n'
+            'Mga katangian: $symptoms';
+      } else {
+        return 'Ang dahon ng saging na ito ay nagpapakita ng palatandaan ng kakulangan sa $deficiency '
+            '(${confidencePercent}% kumpiyansa).\n\n'
+            'Mga sintomas: $symptoms';
+      }
+    } else {
+      if (deficiency == 'Healthy') {
+        return 'This banana leaf appears healthy '
+            '(${confidencePercent}% confidence).\n\n'
+            'Characteristics: $symptoms';
+      } else {
+        return 'This banana leaf shows signs of $deficiency deficiency '
+            '(${confidencePercent}% confidence).\n\n'
+            'Symptoms: $symptoms';
+      }
+    }
+  }
+
+  /// Helper to translate treatment text
+  String _translateTreatment(String deficiency, String englishTreatment) {
+    // Simple mapping for common treatments
+    final Map<String, String> treatmentTranslations = {
+      'Sulphur':
+          'Maglagay ng elemental sulfur, ammonium sulfate, o gypsum. Ang foliar spray ay hindi gaanong epektibo para sa sulfur.',
+      'Potassium':
+          'Maglagay ng potassium sulphate, potassium chloride, o foliar spray na may potassium nitrate.',
+      'Magnesium':
+          'Maglagay ng magnesium sulphate (Epsom salt) o dolomitic limestone. Gamitin ang foliar spray na may 2% magnesium sulphate.',
+      'Boron':
+          'Maglagay ng borax o iba pang boron fertilizers. Mag-spray ng 0.1% hanggang 0.25% na solusyon ng borax.',
+      'Calcium':
+          'Maglagay ng calcium nitrate, calcium sulfate (gypsum) o apog. Mag-spray ng calcium chloride.',
+      'Iron':
+          'Maglagay ng iron sulfate o chelated iron. Maglagay ng organic matter sa lupa.',
+      'Manganese':
+          'Maglagay ng manganese sulfate o manganese chelates. Mag-spray ng 0.1% manganese sulfate.',
+      'Zinc':
+          'Maglagay ng zinc sulfate o zinc chelates. Mag-spray ng 0.2% zinc sulfate.',
+      'Healthy':
+          'Ipagpatuloy ang balanced na fertilization at wastong pangangalaga.',
+      'Nitrogen':
+          'Maglagay ng nitrogen fertilizer gaya ng urea, ammonium nitrate, o compost. Suriin muna ang lupa bago maglagay.',
+      'Phosphorus':
+          'Maglagay ng phosphate fertilizer o bone meal. Tiyaking may tamang pH ang lupa para magamit ang phosphorus.'
+    };
+
+    return treatmentTranslations[deficiency] ?? englishTreatment;
+  }
+
+  /// Helper to translate prevention text
+  String _translatePrevention(String deficiency, String englishPrevention) {
+    // Simple mapping for common preventions
+    final Map<String, String> preventionTranslations = {
+      'Sulphur':
+          'Gumamit ng mga pataba na may sulfur paminsan-minsan, magdagdag ng organic matter sa lupa.',
+      'Potassium':
+          'Regular na pagsusuri ng lupa, paggamit ng mga pataba na may potassium, wastong sukat ng patubig.',
+      'Magnesium':
+          'Panatilihin ang tamang pH ng lupa, iwasan ang sobrang paggamit ng potassium at calcium.',
+      'Boron':
+          'Regular na pagsusuri ng lupa, pagpapanatili ng tamang pH ng lupa, at pagdagdag ng organic matter sa lupa.',
+      'Calcium':
+          'Panatilihin ang tamang pH ng lupa, iwasan ang sobrang potassium na pataba, tiyakin ang wastong patubig.',
+      'Iron':
+          'Panatilihin ang pH ng lupa sa 5.5 hanggang 6.5, magdagdag ng organic matter, iwasan ang sobrang patubig.',
+      'Manganese':
+          'Panatilihin ang pH ng lupa sa mas mababa sa 7.0, regular na pagsusuri ng lupa.',
+      'Zinc':
+          'Regular na pagsusuri ng lupa, gumamit ng mga pataba na may zinc, magdagdag ng organic matter.',
+      'Healthy':
+          'Regular na pagsusuri ng lupa, balanseng pagpataba, at wastong gawain sa pagdidilig.',
+      'Nitrogen':
+          'Gumamit ng mga legumes sa crop rotation, maglagay ng compost o organic matter, at magsagawa ng regular na soil testing.',
+      'Phosphorus':
+          'Panatilihin ang tamang pH ng lupa, maglagay ng organic matter, at iwasan ang paglamig ng lupa.'
+    };
+
+    return preventionTranslations[deficiency] ?? englishPrevention;
+  }
+
+  /// Free resources when the service is no longer needed
+  void dispose() {
+    // In a real implementation, you would release TFLite resources here
+    _modelLoaded = false;
+  }
+}

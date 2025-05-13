@@ -5,5 +5,4 @@
 4: Magnesium
 5: Manganese
 6: Potassium
-7: Sulphur
-8: Zinc
+7: Zinc

@@ -43,6 +43,7 @@ class AppLocalizations {
       'english': 'English',
       'filipino': 'Filipino (Tagalog)',
       'clearChatHistory': 'Clear Chat History',
+      'analyze': 'Analyze Leaf',
     },
     'tl': {
       'appTitle': 'BananaDoc',
@@ -77,6 +78,7 @@ class AppLocalizations {
       'english': 'Ingles',
       'filipino': 'Filipino (Tagalog)',
       'clearChatHistory': 'Burahin ang Kasaysayan ng Chat',
+      'analyze': 'Suriin ang Dahon',
     },
   };
 
@@ -127,6 +129,7 @@ class AppLocalizations {
   String get filipino => _localizedValues[locale.languageCode]!['filipino']!;
   String get clearChatHistory =>
       _localizedValues[locale.languageCode]!['clearChatHistory']!;
+  String get analyze => _localizedValues[locale.languageCode]!['analyze']!;
 }
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

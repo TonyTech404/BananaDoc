@@ -11,6 +11,7 @@ from .image_preprocessor import (
 
 from .model_loader import ModelLoader
 from .deficiency_info import DeficiencyInfoProvider
+from .gemini_handler import GeminiHandler, ConversationContext
 
 __all__ = [
     'load_and_preprocess_image',
@@ -18,5 +19,7 @@ __all__ = [
     'load_image_from_bytes',
     'decode_and_load_base64_image',
     'ModelLoader',
-    'DeficiencyInfoProvider'
+    'DeficiencyInfoProvider',
+    'GeminiHandler',
+    'ConversationContext'
 ] 

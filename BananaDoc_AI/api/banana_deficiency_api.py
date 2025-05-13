@@ -11,13 +11,15 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.image_preprocessor import decode_and_load_base64_image
 from utils.model_loader import ModelLoader
 from utils.deficiency_info import DeficiencyInfoProvider
+from utils.gemini_handler import GeminiHandler
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize model loader
+# Initialize components
 model_loader = ModelLoader(model_dir='../model')
 deficiency_info_provider = DeficiencyInfoProvider()
+gemini_handler = GeminiHandler()
 
 @app.route('/predict', methods=['POST'])
 def predict_api():
@@ -56,8 +58,48 @@ def predict_api():
             'probabilities': probabilities
         }
         
+        # Update Gemini handler with this prediction
+        gemini_handler.update_with_prediction(result)
+        
         return jsonify(result)
     
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/chat', methods=['POST'])
+def chat_api():
+    """Handle a chat query using the Gemini API with context awareness"""
+    if not request.json or 'query' not in request.json:
+        return jsonify({'error': 'No query provided'}), 400
+    
+    try:
+        # Get the user query
+        user_query = request.json['query']
+        
+        # Process the query
+        response = gemini_handler.process_query(user_query)
+        
+        return jsonify({
+            'response': response
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/clear-context', methods=['POST'])
+def clear_context():
+    """Clear the conversation context"""
+    try:
+        gemini_handler.context_manager.clear_context()
+        return jsonify({'message': 'Context cleared successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/context', methods=['GET'])
+def get_context():
+    """Get the current context for debugging"""
+    try:
+        return jsonify(gemini_handler.context_manager.get_context_for_llm())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -93,7 +93,7 @@ class _AssetTestScreenState extends State<AssetTestScreen> {
     setState(() {
       _logs.add(log);
     });
-    debugPrint(log); // Also print to console for debugging
+    print(log); // Also print to console for debugging
   }
 
   @override

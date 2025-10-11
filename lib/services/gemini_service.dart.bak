@@ -39,7 +39,7 @@ Farmer's query: $description
 ''';
 
     try {
-      debugPrint('Making API call to: $apiUrl');
+      print('Making API call to: $apiUrl');
 
       final response = await http.post(
         Uri.parse('$apiUrl?key=$apiKey'),
@@ -61,9 +61,9 @@ Farmer's query: $description
         }),
       );
 
-      debugPrint('API Response Status: ${response.statusCode}');
+      print('API Response Status: ${response.statusCode}');
       if (response.statusCode == 200) {
-        debugPrint(
+        print(
             'API Response Body First 200 chars: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}...');
 
         final jsonResponse = jsonDecode(response.body);
@@ -95,12 +95,12 @@ Farmer's query: $description
           prevention: '',
         );
       } else {
-        debugPrint('API Error: ${response.statusCode} - ${response.body}');
+        print('API Error: ${response.statusCode} - ${response.body}');
         throw Exception(
             'API Error: ${response.statusCode} - ${response.reasonPhrase}');
       }
     } catch (e) {
-      debugPrint('Error calling Gemini API: $e');
+      print('Error calling Gemini API: $e');
       throw Exception('Failed to analyze leaf condition: $e');
     }
   }

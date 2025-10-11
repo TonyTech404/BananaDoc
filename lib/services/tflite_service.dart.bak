@@ -484,21 +484,21 @@ Iron''';
     if (isFilipino) {
       if (deficiency == 'Healthy') {
         return 'Ang dahon ng saging na ito ay mukhang malusog '
-            '($confidencePercent% kumpiyansa).\n\n'
+            '(${confidencePercent}% kumpiyansa).\n\n'
             'Mga katangian: $symptoms';
       } else {
         return 'Ang dahon ng saging na ito ay nagpapakita ng palatandaan ng kakulangan sa $deficiency '
-            '($confidencePercent% kumpiyansa).\n\n'
+            '(${confidencePercent}% kumpiyansa).\n\n'
             'Mga sintomas: $symptoms';
       }
     } else {
       if (deficiency == 'Healthy') {
         return 'This banana leaf appears healthy '
-            '($confidencePercent% confidence).\n\n'
+            '(${confidencePercent}% confidence).\n\n'
             'Characteristics: $symptoms';
       } else {
         return 'This banana leaf shows signs of $deficiency deficiency '
-            '($confidencePercent% confidence).\n\n'
+            '(${confidencePercent}% confidence).\n\n'
             'Symptoms: $symptoms';
       }
     }

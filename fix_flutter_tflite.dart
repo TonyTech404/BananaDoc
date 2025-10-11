@@ -43,7 +43,7 @@ class _TFLiteFixScreenState extends State<TFLiteFixScreen> {
     setState(() {
       _logs.add(message);
     });
-    print(message);
+    debugPrint(message);
   }
 
   Future<void> _fixTFLiteOfflineMode() async {

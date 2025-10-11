@@ -1,5 +1,8 @@
-// Store your Gemini API key here
-// Get your API key from https://makersuite.google.com/app/apikey
+// Environment configuration
+// Use environment variables for sensitive data
+// Create a .env file based on .env.example
+require('dotenv').config();
+
 module.exports = {
-  GEMINI_API_KEY: "AIzaSyBuAJh_jiXD8643ZjIbPoSNTNMBVRrM3pM" // Replace with your actual API key
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '' // Load from environment variable
 }; 

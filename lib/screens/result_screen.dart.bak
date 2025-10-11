@@ -141,9 +141,6 @@ class _ResultScreenState extends State<ResultScreen> {
                 final chatService =
                     Provider.of<ChatHistoryService>(context, listen: false);
 
-                // Store navigator reference before async operations
-                final navigator = Navigator.of(context);
-
                 // Show loading indicator
                 showDialog(
                   context: context,
@@ -202,30 +199,28 @@ class _ResultScreenState extends State<ResultScreen> {
                 }
 
                 // Close loading dialog
-                if (mounted) navigator.pop();
+                Navigator.of(context).pop();
 
                 // Navigate back to main screen and select the chat tab
-                if (mounted) navigator.popUntil((route) => route.isFirst);
+                Navigator.of(context).popUntil((route) => route.isFirst);
 
                 // Wait a moment to ensure we're back at the main screen
                 Future.microtask(() {
-                  if (!mounted) return;
                   // Find and use the MainNavigationScreenState to switch tabs
                   // This approach avoids GlobalKey issues
-                  if (mounted) {
-                    navigator.pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) {
-                          const mainScreen = MainNavigationScreen();
-                          Future.microtask(() {
-                            // Use the static method to navigate to chat tab
-                            MainNavigationScreenState.navigateToChatTab();
-                          });
-                          return mainScreen;
-                        },
-                      ),
-                    );
-                  }
+                  final navigatorState = Navigator.of(context);
+                  navigatorState.pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) {
+                        final mainScreen = const MainNavigationScreen();
+                        Future.microtask(() {
+                          // Use the static method to navigate to chat tab
+                          MainNavigationScreenState.navigateToChatTab();
+                        });
+                        return mainScreen;
+                      },
+                    ),
+                  );
                 });
               },
               icon: Icons.chat,
@@ -253,7 +248,7 @@ class _ResultScreenState extends State<ResultScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: color.withValues(alpha: 0.3), width: 1),
+        side: BorderSide(color: color.withOpacity(0.3), width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),

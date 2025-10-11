@@ -24,17 +24,17 @@ class NutrientDeficiencyService {
   // Method to check if the API is available
   Future<bool> isApiAvailable() async {
     try {
-      debugPrint('Checking API at $healthUrl');
+      print('Checking API at $healthUrl');
       final response = await http
           .get(
             Uri.parse(healthUrl),
           )
           .timeout(const Duration(seconds: 5));
 
-      debugPrint('API response: ${response.statusCode}');
+      print('API response: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
-      debugPrint('API not available: $e');
+      print('API not available: $e');
       return false;
     }
   }
@@ -50,7 +50,7 @@ class NutrientDeficiencyService {
 
       return _sendAnalysisRequest(base64Image);
     } catch (e) {
-      debugPrint('Error in NutrientDeficiencyService: $e');
+      print('Error in NutrientDeficiencyService: $e');
       throw Exception('Failed to analyze image: $e');
     }
   }
@@ -63,7 +63,7 @@ class NutrientDeficiencyService {
 
       return _sendAnalysisRequest(base64Image);
     } catch (e) {
-      debugPrint('Error in NutrientDeficiencyService (web): $e');
+      print('Error in NutrientDeficiencyService (web): $e');
       throw Exception('Failed to analyze image: $e');
     }
   }
@@ -174,11 +174,11 @@ class NutrientDeficiencyService {
 
     if (isFilipino) {
       return 'Ang dahon ng saging na ito ay nagpapakita ng palatandaan ng kakulangan sa $deficiency '
-          '($confidencePercent% kumpiyansa).\n\n'
+          '(${confidencePercent}% kumpiyansa).\n\n'
           'Mga sintomas: $symptoms';
     } else {
       return 'This banana leaf shows signs of $deficiency deficiency '
-          '($confidencePercent% confidence).\n\n'
+          '(${confidencePercent}% confidence).\n\n'
           'Symptoms: $symptoms';
     }
   }
@@ -205,7 +205,7 @@ class NutrientDeficiencyService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error picking image: $e');
+      print('Error picking image: $e');
       throw Exception('Failed to pick image: $e');
     }
   }

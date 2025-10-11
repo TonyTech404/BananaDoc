@@ -55,11 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final chatService = Provider.of<ChatHistoryService>(context, listen: false);
 
     // Debug output for diagnostics
-    debugPrint('====== SENDING MESSAGE ======');
-    debugPrint('Message: $message');
-    debugPrint('Current deficiency: ${chatService.currentDeficiency}');
-    debugPrint('Has context: ${chatService.messages.isNotEmpty}');
-    debugPrint('Message count: ${chatService.messages.length}');
+    print('====== SENDING MESSAGE ======');
+    print('Message: $message');
+    print('Current deficiency: ${chatService.currentDeficiency}');
+    print('Has context: ${chatService.messages.isNotEmpty}');
+    print('Message count: ${chatService.messages.length}');
 
     // Add user message to history
     chatService.addMessage(ChatMessage(
@@ -79,57 +79,57 @@ class _HomeScreenState extends State<HomeScreen> {
       // Set the current locale in the LLM service
       final locale = Provider.of<LocaleProvider>(context, listen: false).locale;
       _llmService.currentLocale = locale;
-      debugPrint('Current locale: ${locale.languageCode}');
+      print('Current locale: ${locale.languageCode}');
 
       // CRITICAL FIX: Handling simple questions about deficiencies directly
       // without going through external APIs
       if (chatService.currentDeficiency.isNotEmpty) {
         // Get the full conversation context - this is critical for follow-up questions
         final conversationContext = chatService.getContext();
-        debugPrint(
+        print(
             'USING CONVERSATION CONTEXT (${conversationContext.length} chars)');
 
         // IMPROVED: Check if this is a follow-up type question that requires strong contextual handling
         final bool isFollowUp = _isFollowUpOrActionQuestion(
             message.toLowerCase().trim(), locale.languageCode == 'tl');
-        debugPrint('Is follow-up or action question: $isFollowUp');
+        print('Is follow-up or action question: $isFollowUp');
 
         if (isFollowUp) {
-          debugPrint(
+          print(
               'ENHANCED HANDLING: Follow-up question about ${chatService.currentDeficiency}');
 
           // For very simple action questions, get direct treatment instructions
           if (_isActionQuestion(message.toLowerCase().trim())) {
-            debugPrint(
+            print(
                 'ACTION QUESTION DETECTED: Getting treatment for ${chatService.currentDeficiency}');
             response = await _llmService
                 .getTreatmentRecommendation(chatService.currentDeficiency);
           }
           // For why/cause questions
           else if (_isCauseQuestion(message.toLowerCase().trim())) {
-            debugPrint(
+            print(
                 'CAUSE QUESTION DETECTED: Getting explanation for ${chatService.currentDeficiency}');
             response = await _llmService.answerFarmerQuestion(
                 chatService.currentDeficiency,
-                "why do plants have "
-                    "${chatService.currentDeficiency}"
+                "why do plants have " +
+                    chatService.currentDeficiency +
                     " deficiency?",
                 context: conversationContext);
           }
           // For prevention questions
           else if (_isPreventionQuestion(message.toLowerCase().trim())) {
-            debugPrint(
+            print(
                 'PREVENTION QUESTION DETECTED: Getting prevention for ${chatService.currentDeficiency}');
             response = await _llmService.answerFarmerQuestion(
                 chatService.currentDeficiency,
-                "how to prevent "
-                    "${chatService.currentDeficiency}"
+                "how to prevent " +
+                    chatService.currentDeficiency +
                     " deficiency?",
                 context: conversationContext);
           }
           // For any other follow-up questions, send with context
           else {
-            debugPrint('FOLLOW-UP QUESTION: Using enhanced contextual handling');
+            print('FOLLOW-UP QUESTION: Using enhanced contextual handling');
             // Specifically craft the prompt to maintain context
             String enhancedMessage = locale.languageCode == 'tl'
                 ? "Tungkol sa ${chatService.currentDeficiency} deficiency: $message"
@@ -146,10 +146,10 @@ class _HomeScreenState extends State<HomeScreen> {
               context: conversationContext);
         }
 
-        debugPrint('RESPONSE LENGTH: ${response.length}');
+        print('RESPONSE LENGTH: ${response.length}');
       } else {
         // For initial analysis when no deficiency is identified yet
-        debugPrint('NO DEFICIENCY DETECTED YET: Using general analysis');
+        print('NO DEFICIENCY DETECTED YET: Using general analysis');
         final localeProvider =
             Provider.of<LocaleProvider>(context, listen: false);
         final GeminiService geminiService = GeminiService();
@@ -162,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // CRITICAL: If Gemini detected a deficiency, IMMEDIATELY set it
         String detectedDeficiency = analysisResult.deficiencyType;
         if (detectedDeficiency.isNotEmpty && detectedDeficiency != 'Unknown') {
-          debugPrint('SETTING DEFICIENCY FROM ANALYSIS: $detectedDeficiency');
+          print('SETTING DEFICIENCY FROM ANALYSIS: $detectedDeficiency');
           chatService.setDeficiency(detectedDeficiency);
 
           // Since we now know the deficiency, provide a proper explanation
@@ -179,8 +179,8 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // Debug print final response
-      debugPrint('==== FINAL RESPONSE ====');
-      debugPrint(
+      print('==== FINAL RESPONSE ====');
+      print(
           response.substring(0, response.length > 100 ? 100 : response.length));
 
       // Add assistant response to history
@@ -195,20 +195,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _scrollToBottom();
     } catch (e) {
-      debugPrint('Error in HomeScreen: $e');
+      print('Error in HomeScreen: $e');
 
       String errorMessage = e.toString();
       if (errorMessage.contains('Failed to analyze leaf condition')) {
-        if (mounted) {
-          final locale =
-              Provider.of<LocaleProvider>(context, listen: false).locale;
-          if (locale.languageCode == 'tl') {
-            errorMessage =
-                'Paumanhin, nagkaroon ng problema sa koneksyon sa AI service. Pakisuri ang iyong koneksyon sa internet at subukang muli.';
-          } else {
-            errorMessage =
-                'Sorry, there was a problem connecting to the AI service. Please check your network connection and try again.';
-          }
+        final locale =
+            Provider.of<LocaleProvider>(context, listen: false).locale;
+        if (locale.languageCode == 'tl') {
+          errorMessage =
+              'Paumanhin, nagkaroon ng problema sa koneksyon sa AI service. Pakisuri ang iyong koneksyon sa internet at subukang muli.';
+        } else {
+          errorMessage =
+              'Sorry, there was a problem connecting to the AI service. Please check your network connection and try again.';
         }
       }
 
@@ -619,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
           BoxShadow(
             offset: const Offset(0, -2),
             blurRadius: 4,
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
           ),
         ],
       ),

@@ -153,7 +153,7 @@ class LLMService {
             question.toLowerCase().contains("anong pataba") ||
             question.toLowerCase().contains("ano ang pataba") ||
             (question.toLowerCase().contains("kailangan") && question.toLowerCase().contains("pataba"))) {
-          debugPrint('Is follow-up question: true (fertilizer question)');
+          print('Is follow-up question: true (fertilizer question)');
 
           switch (deficiencyType) {
             case 'Calcium':
@@ -220,7 +220,7 @@ class LLMService {
 
         // Special case for timeline questions which are always follow-ups in a diagnosis context
         if (_isTimelineQuestion(question, isTagalog)) {
-          debugPrint('Is follow-up question: true (timeline question)');
+          print('Is follow-up question: true (timeline question)');
 
           if (isTagalog) {
             return 'Para sa $deficiencyType deficiency na nakita sa iyong saging, makikita mo ang pagbabago sa loob ng 2-4 na linggo kung gumamit ka ng foliar spray. Para naman sa soil application, umaabot ng 1-2 buwan bago makita ang buong epekto. Makikita mo muna ang pagbabago sa mga bagong dahon.';
@@ -238,7 +238,7 @@ class LLMService {
             question.toLowerCase().contains("magkano") ||
             question.toLowerCase().contains("presyo") ||
             question.toLowerCase().contains("gastos")) {
-          debugPrint('Is follow-up question: true (cost question)');
+          print('Is follow-up question: true (cost question)');
 
           if (isTagalog) {
             switch (deficiencyType) {
@@ -295,7 +295,7 @@ class LLMService {
             question.toLowerCase().contains("anong pataba") ||
             question.toLowerCase().contains("ano ang pataba") ||
             question.toLowerCase().contains("kailangan") && question.toLowerCase().contains("pataba")) {
-          debugPrint('Is follow-up question: true (fertilizer question)');
+          print('Is follow-up question: true (fertilizer question)');
 
           switch (deficiencyType) {
             case 'Calcium':
@@ -344,7 +344,7 @@ class LLMService {
 
         // Determine if this is a follow-up question
         bool isFollowUp = _isFollowUpQuestion(question, isTagalog);
-        debugPrint('Is follow-up question: $isFollowUp');
+        print('Is follow-up question: $isFollowUp');
 
         // Parse conversation to determine what has already been discussed
         // Check what aspects have been discussed for better context
@@ -369,7 +369,7 @@ class LLMService {
 
         // For genuine follow-up questions, provide more context-dependent answers
         if (isFollowUp) {
-          debugPrint('Handling follow-up with improved context awareness');
+          print('Handling follow-up with improved context awareness');
 
           // Special handling for short follow-up questions
           if (question.length < 15) {
@@ -478,13 +478,13 @@ class LLMService {
       // Fall back to standard responses if no context
       if (deficiencyType.isNotEmpty &&
           _isSimpleActionQuestion(question, isTagalog)) {
-        debugPrint('Simple action question detected, providing treatment answer');
+        print('Simple action question detected, providing treatment answer');
         return _generateSpecificTreatmentAnswer(deficiencyType, isTagalog);
       }
 
       return _generateAnswer(deficiencyType, question, isTagalog: isTagalog);
     } catch (e) {
-      debugPrint('Error answering question: $e');
+      print('Error answering question: $e');
       if (currentLocale?.languageCode == 'tl') {
         return 'Paumanhin, hindi ko ma-proseso ang iyong katanungan. Pakisubukang muli.';
       } else {
@@ -496,8 +496,8 @@ class LLMService {
   // Generate a contextual answer based on deficiency, question, and conversation history
   String _generateContextualAnswer(
       String deficiency, String question, String context, bool isTagalog) {
-    debugPrint('Generating contextual answer for $deficiency question: $question');
-    debugPrint('Context length: ${context.length}');
+    print('Generating contextual answer for $deficiency question: $question');
+    print('Context length: ${context.length}');
 
     // Extract key information from the context
     // Note: These variables could be used for enhanced context analysis
@@ -517,11 +517,11 @@ class LLMService {
 
     // IMPROVED: Check for common follow-up patterns that indicate continuation of a conversation
     bool isFollowUpQuestion = _isFollowUpQuestion(question, isTagalog);
-    debugPrint('Is follow-up question: $isFollowUpQuestion');
+    print('Is follow-up question: $isFollowUpQuestion');
 
     // For simple follow-up questions, ensure we maintain reference to the deficiency
     if (isFollowUpQuestion) {
-      debugPrint('Handling follow-up question with reinforced context awareness');
+      print('Handling follow-up question with reinforced context awareness');
       return _generateSpecificTreatmentAnswer(deficiency, isTagalog);
     }
 
@@ -1260,6 +1260,53 @@ class LLMService {
     return false;
   }
 
+  // Generate cost-related response
+  String _generateCostResponse(String deficiency, bool isTagalog) {
+    if (isTagalog) {
+      switch (deficiency) {
+        case 'Calcium':
+          return 'Para sa Calcium deficiency treatment, ang halagang kakailanganin mo ay nasa pagitan ng:\n\n'
+              '- Calcium nitrate: ₱500-800 kada sako (25kg), sapat na para sa 0.25-0.5 ektarya\n'
+              '- Agricultural lime: ₱200-400 kada sako (40kg), para sa pH adjustment at calcium\n'
+              '- Calcium foliar spray: ₱300-600 kada litro ng concentrate\n\n'
+              'Para sa maliit na sakahan, ang total na gastos ay maaaring nasa ₱1,500-3,000 depende sa kalubhaan ng problema at laki ng iyong taniman. Mas cost-effective na gamutin nang maaga kaysa hintayin pang lumala ang kakulangan.';
+        case 'Sulphur':
+          return 'Para sa Sulphur deficiency treatment, ang gastusin ay humigit-kumulang:\n\n'
+              '- Ammonium sulphate: ₱600-900 kada sako (50kg), sapat para sa 0.5 ektarya\n'
+              '- Elemental sulphur: ₱400-700 kada sako (25kg)\n'
+              '- Gypsum (calcium sulphate): ₱250-450 kada sako (40kg)\n\n'
+              'Para sa karaniwang sakahan, ang budget na ₱2,000-4,000 ay sapat na para sa paggamot. Kadalasan, hindi kailangan ng madalas na pag-apply ng sulphur kaya ito ay isang cost-effective na investment para sa kalusugan ng iyong mga puno ng saging.';
+        default:
+          return 'Para sa $deficiency deficiency treatment, ang karaniwang gastusin ay:\n\n'
+              '- Commercial fertilizers: ₱500-1,200 kada sako depende sa formulation\n'
+              '- Foliar sprays: ₱300-800 kada litro ng concentrate\n'
+              '- Organic amendments: ₱200-500 kada sako\n\n'
+              'Para sa isang maliit na sakahan (0.5-1 ektarya), ang kabuuang budget na ₱2,000-5,000 ay makakatulong na para maayos ang deficiency. Mas makakatipid ka sa long run kung gagawin mo ang regular na soil testing at balanced fertilization para maiwasan ang deficiency sa hinaharap.';
+      }
+    } else {
+      switch (deficiency) {
+        case 'Calcium':
+          return 'For treating Calcium deficiency, here\'s a breakdown of approximate costs:\n\n'
+              '- Calcium nitrate: \$10-15 per 25kg bag, enough for 0.25-0.5 hectare\n'
+              '- Agricultural lime: \$4-8 per 40kg bag for pH adjustment and calcium\n'
+              '- Calcium foliar spray: \$6-12 per liter of concentrate\n\n'
+              'For a small farm, total costs would range from \$30-60 depending on severity and plantation size. Early treatment is more cost-effective than waiting until deficiency symptoms are severe.';
+        case 'Potassium':
+          return 'For Potassium deficiency treatment, the costs typically include:\n\n'
+              '- Potassium sulfate (SOP): \$15-25 per 25kg bag\n'
+              '- Potassium chloride (MOP): \$12-20 per 25kg bag\n'
+              '- Potassium nitrate foliar spray: \$8-15 per liter\n\n'
+              'For a typical banana plantation, budget around \$40-80 per hectare for treatment. This is a worthwhile investment as potassium directly affects fruit quality and yield, providing good return on investment through improved harvest.';
+        default:
+          return 'For $deficiency deficiency treatment, typical costs include:\n\n'
+              '- Commercial fertilizers: \$10-25 per bag depending on formulation\n'
+              '- Foliar sprays: \$6-16 per liter of concentrate\n'
+              '- Organic amendments: \$4-10 per bag\n\n'
+              'For a small plantation (0.5-1 hectare), a total budget of \$40-100 should address the deficiency. You\'ll save money in the long run by doing regular soil testing and balanced fertilization to prevent deficiencies from occurring.';
+      }
+    }
+  }
+
   /// Generate supplemental information for follow-up questions
   String _generateSupplementalInfo(String deficiency, bool isTagalog) {
     if (isTagalog) {
@@ -1299,6 +1346,50 @@ class LLMService {
     }
   }
 
+  /// Check if a question is asking about cost
+  bool _isCostQuestion(String question, bool isTagalog) {
+    question = question.toLowerCase().trim();
+
+    if (isTagalog) {
+      return question.contains('magkano') ||
+          question.contains('presyo') ||
+          question.contains('halaga') ||
+          question.contains('gastos') ||
+          question.contains('budget') ||
+          question.contains('mahal') ||
+          question.contains('mura');
+    } else {
+      return question.contains('cost') ||
+          question.contains('price') ||
+          question.contains('expensive') ||
+          question.contains('cheap') ||
+          question.contains('afford') ||
+          question.contains('money') ||
+          question.contains('budget') ||
+          question.contains('how much');
+    }
+  }
+
+  /// Check if a question is asking for confirmation
+  bool _isConfirmationQuestion(String question, bool isTagalog) {
+    question = question.toLowerCase().trim();
+
+    if (isTagalog) {
+      return question.contains('talaga') ||
+          question.contains('totoo') ||
+          question.contains('sigurado') ||
+          question.contains('ganun ba') ||
+          question.contains('tama ba');
+    } else {
+      return question.contains('really') ||
+          question.contains('true') ||
+          question.contains('sure') ||
+          question.contains('right') ||
+          question.contains('correct') ||
+          question.contains('actually');
+    }
+  }
+
   /// Check if a question is asking about timeline or duration
   bool _isTimelineQuestion(String question, bool isTagalog) {
     question = question.toLowerCase().trim();
@@ -1317,6 +1408,63 @@ class LLMService {
           question.contains('how many days') ||
           question.contains('how many weeks') ||
           question.contains('how many months');
+    }
+  }
+
+  // Check if a question is asking about fertilizer in Tagalog
+  bool _isTagalogFertilizerQuestion(String question) {
+    return question.toLowerCase().contains("pataba") ||
+        question.toLowerCase().contains("abono") ||
+        question.toLowerCase().contains("anong klaseng pataba") ||
+        question.toLowerCase().contains("anong uri ng pataba") ||
+        question.toLowerCase().contains("ano ang pataba") ||
+        question.toLowerCase().contains("fertilizer");
+  }
+
+  // For contextual questions in Tagalog about fertilizer
+  String _generateTagalogFertilizerAnswer(String deficiencyType) {
+    switch (deficiencyType) {
+      case 'Calcium':
+        return 'Para sa Calcium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Calcium nitrate (15.5% N, 19% Ca)** - Mabilis kumilos na source ng calcium, mag-apply ng 2-5 kg bawat ektarya\n'
+            '2. **Calcium sulfate (Gypsum, 22% Ca)** - Mas mabagal na release, mainam para sa soil application sa 500-1000 kg bawat ektarya\n'
+            '3. **Dolomitic lime (Calcium Magnesium Carbonate)** - Para sa acidic na lupa, 1-2 toneladang bawat ektarya depende sa pH ng lupa\n'
+            '4. **Calcium chelate** - Para sa foliar spray, gamitin sa 2-3 g/L concentration\n\n'
+            'Para sa agarang resulta, gumamit ng foliar spray na may calcium chloride (2% solution). Para sa pangmatagalang solusyon, isama ang gypsum o lime sa lupa. Laging sundin ang mga tagubilin sa produkto para sa eksaktong rate ng application.';
+      case 'Potassium':
+        return 'Para sa Potassium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Potassium sulfate (SOP, 50% K₂O)** - Mas mababang salt index, angkop para sa saging sa 300-500 kg/ektarya\n'
+            '2. **Potassium chloride (MOP, 60% K₂O)** - Mas abot-kayang opsyon, gamitin sa 250-400 kg/ektarya\n'
+            '3. **Potassium nitrate (13% N, 44% K₂O)** - Mabilis na pagsipsip, mainam para sa foliar application sa 2-3% solution\n'
+            '4. **NPK fertilizers na mataas sa K** - Tulad ng 13-0-46 o katulad na ratio\n\n'
+            'Para sa agarang resulta, mag-apply ng potassium nitrate bilang foliar spray. Para sa pangmatagalang pangangalaga, gumamit ng potassium sulfate dahil naglalaman din ito ng sulfur. Iwasan ang sobrang paglalagay ng magnesium fertilizer dahil nakikipagkompetensya ito sa pagsipsip ng potassium.';
+      case 'Sulphur':
+        return 'Para sa Sulphur deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Elemental sulphur** - Mabagal na release, 90-99% S, mag-apply ng 20-30 kg/ektarya\n'
+            '2. **Ammonium sulphate** - 24% S at 21% N, mag-apply ng 100-200 kg/ektarya\n'
+            '3. **Potassium sulphate** - 18% S at 50% K₂O, mainam kung parehong nutrients ang kailangan\n'
+            '4. **Gypsum (Calcium sulphate)** - 13-18% S at 22% Ca, mag-apply ng 200-300 kg/ektarya\n\n'
+            'Ang elemental sulphur ay nangangailangan ng panahon para maging available sa halaman, kaya ang ammonium sulphate o potassium sulphate ay mas mainam para sa mas mabilis na resulta. Ang foliar sprays na may sulphate ay makakapagbigay ng mabilis na pagwawasto ng mga sintomas.';
+      case 'Nitrogen':
+        return 'Para sa Nitrogen deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Urea (46% N)** - Mataas na concentration ng nitrogen, mag-apply ng 100-200 kg/ektarya\n'
+            '2. **Ammonium nitrate (34% N)** - Medyo mabilis na release, gamitin sa 150-250 kg/ektarya\n'
+            '3. **Ammonium sulfate (21% N, 24% S)** - Nagbibigay din ng sulfur, mag-apply ng 200-300 kg/ektarya\n'
+            '4. **NPK fertilizers na mataas sa N** - Tulad ng 20-5-10 o katulad na ratio\n\n'
+            'Para sa organikong opsyon, gumamit ng compost, manure, o blood meal. Ang split application ng nitrogen ay mas maganda para sa saging para iwasan ang nutrient leaching.';
+      case 'Magnesium':
+        return 'Para sa Magnesium deficiency, gamitin ang mga sumusunod na uri ng pataba:\n\n'
+            '1. **Magnesium sulfate (Epsom salt, 10% Mg, 13% S)** - Mag-apply ng 20-40 kg/ektarya\n'
+            '2. **Dolomitic lime (6-12% Mg)** - Maganda kung acidic din ang lupa, mag-apply base sa soil test\n'
+            '3. **Magnesium oxide (55-60% Mg)** - Para sa mabilis na correction, 10-15 kg/ektarya\n'
+            '4. **Kieserite (15-17% Mg, 20-22% S)** - Medium release rate, 50-100 kg/ektarya\n\n'
+            'Para sa foliar spray, gumamit ng 2% magnesium sulfate solution, i-spray tuwing 2-3 linggo hanggang sa mawala ang mga sintomas. Mag-ingat sa sobrang paglalagay ng potassium dahil maaaring makipag-compete ito sa magnesium.';
+      default:
+        return 'Para sa $deficiencyType deficiency, ang mga pinakamagandang pataba na pwedeng gamitin ay:\n\n'
+            '1. **Espesyal na $deficiencyType fertilizers** - Maghanap ng mga produktong partikular na ginawa para sa deficiency na ito\n'
+            '2. **Foliar sprays** - Para sa mabilis na pagwawasto, maghanap ng liquid fertilizer na may $deficiencyType\n'
+            '3. **Organikong opsyon** - Compost na pinagyaman ng mga minerals o partikular na organikong amendments\n\n'
+            'Ang eksaktong rate ng application ay depende sa kalubhaan ng deficiency at sa kondisyon ng iyong lupa. Para sa mas tumpak na rekomendasyon, magsagawa ng soil test at kumonsulta sa lokal na agricultural extension specialist.';
     }
   }
 
@@ -1339,7 +1487,7 @@ class LLMService {
       totalDelay += 300;
     }
     
-    debugPrint('Simulating AI thinking for ${totalDelay}ms...');
+    print('Simulating AI thinking for ${totalDelay}ms...');
     await Future.delayed(Duration(milliseconds: totalDelay));
   }
 }

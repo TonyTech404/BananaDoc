@@ -50,3 +50,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Large model files (>100MB should use Git LFS)
+*.keras
+*.h5
+*.pb
+*.pth
+*.safetensors
+**/model/*.keras
+**/model/*.h5
+**/models/*.keras
+**/models/*.h5
+BananaDoc_AI/model/simple_banana_model.keras
+BananaDoc_AI/model/banana_nutrient_model.keras
+BananaDoc_AI/model/banana_nutrient_model.h5

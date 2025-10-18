@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_fonts/google_fonts.dart';
+// google_fonts is applied in the theme file; main doesn't need a direct import
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/deficiency_detection_screen.dart';
@@ -12,6 +12,8 @@ import 'services/llm_service.dart';
 import 'services/nutrient_deficiency_service.dart';
 import 'services/offline_deficiency_service.dart';
 import 'config/app_config.dart';
+import 'theme/app_theme.dart';
+import 'widgets/farmer_language_selector.dart';
 
 // Remove global key - it's causing duplication issues
 // Use a navigation service singleton instead
@@ -59,16 +61,7 @@ class BananaDocApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        primaryColor: const Color(0xFF4CAF50),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4CAF50),
-          primary: const Color(0xFF4CAF50),
-          secondary: const Color(0xFFFFEB3B),
-        ),
-        textTheme: GoogleFonts.poppinsTextTheme(),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
       home: const AppInitializer(),
     );
   }
@@ -304,62 +297,11 @@ class MainNavigationScreenState extends State<MainNavigationScreen> {
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
               actions: [
-                PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    if (value == 'en') {
-                      localeProvider.setLocale(const Locale('en', ''));
-                      // Update language preference
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('selected_language', 'en');
-                      // Force rebuild of the app to ensure translations are applied
-                      if (context.mounted) {
-                        setState(() {});
-                      }
-                    } else if (value == 'tl') {
-                      localeProvider.setLocale(const Locale('tl', ''));
-                      // Update language preference
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setString('selected_language', 'tl');
-                      // Force rebuild of the app to ensure translations are applied
-                      if (context.mounted) {
-                        setState(() {});
-                      }
-                    } else if (value == 'language_selection') {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LanguageSelectionScreen(),
-                        ),
-                      );
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'en',
-                      child: Row(
-                        children: [
-                          if (localeProvider.locale.languageCode == 'en')
-                            const Icon(Icons.check, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Text(localizations.english),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'tl',
-                      child: Row(
-                        children: [
-                          if (localeProvider.locale.languageCode == 'tl')
-                            const Icon(Icons.check, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Text(localizations.filipino),
-                        ],
-                      ),
-                    ),
-                  ],
-                  icon: const Icon(Icons.language),
-                  tooltip: localizations.selectLanguage,
+                FarmerLanguageSelector(
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                  textColor: Colors.white,
                 ),
+                const SizedBox(width: 8),
               ],
             ),
       body: _screens[_navigationService.currentIndex],

@@ -44,6 +44,12 @@ class AppLocalizations {
       'filipino': 'Filipino (Tagalog)',
       'clearChatHistory': 'Clear Chat History',
       'analyze': 'Analyze Leaf',
+      'photographyTips': 'Photography Tips',
+      'tip1GoodLighting': 'Take photos in good natural lighting',
+      'tip2CloseUp': 'Get close-up shots of affected leaves',
+      'tip3ClearFocus': 'Make sure the image is clear and in focus',
+      'selectedImage': 'Selected Image',
+      'retake': 'Retake',
     },
     'tl': {
       'appTitle': 'BananaDoc',
@@ -79,6 +85,12 @@ class AppLocalizations {
       'filipino': 'Filipino (Tagalog)',
       'clearChatHistory': 'Burahin ang Kasaysayan ng Chat',
       'analyze': 'Suriin ang Dahon',
+      'photographyTips': 'Mga Tip sa Pagkuha ng Larawan',
+      'tip1GoodLighting': 'Kumuha ng larawan sa magandang natural na liwanag',
+      'tip2CloseUp': 'Kumuha ng malapit na larawan ng mga apektadong dahon',
+      'tip3ClearFocus': 'Siguraduhing malinaw at naka-focus ang larawan',
+      'selectedImage': 'Napiling Larawan',
+      'retake': 'Ulitin',
     },
   };
 
@@ -130,6 +142,17 @@ class AppLocalizations {
   String get clearChatHistory =>
       _localizedValues[locale.languageCode]!['clearChatHistory']!;
   String get analyze => _localizedValues[locale.languageCode]!['analyze']!;
+  String get photographyTips =>
+      _localizedValues[locale.languageCode]!['photographyTips']!;
+  String get tip1GoodLighting =>
+      _localizedValues[locale.languageCode]!['tip1GoodLighting']!;
+  String get tip2CloseUp =>
+      _localizedValues[locale.languageCode]!['tip2CloseUp']!;
+  String get tip3ClearFocus =>
+      _localizedValues[locale.languageCode]!['tip3ClearFocus']!;
+  String get selectedImage =>
+      _localizedValues[locale.languageCode]!['selectedImage']!;
+  String get retake => _localizedValues[locale.languageCode]!['retake']!;
 }
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

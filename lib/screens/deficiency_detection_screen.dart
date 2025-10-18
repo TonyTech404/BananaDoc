@@ -8,6 +8,7 @@ import '../services/nutrient_deficiency_service.dart';
 import '../services/offline_deficiency_service.dart';
 import '../models/leaf_analysis_result.dart';
 import '../widgets/analysis_result_card.dart';
+import '../widgets/farmer_image_picker.dart';
 import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
 import '../services/tflite_service.dart';
@@ -231,57 +232,6 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
       appBar: AppBar(
         title: Text(localizations.deficiencyDetection),
         elevation: 0,
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'en') {
-                localeProvider.setLocale(const Locale('en', ''));
-                // Also update TFLite service locale
-                final tfliteService = TFLiteService();
-                tfliteService.currentLocale = const Locale('en', '');
-                // Force refresh UI
-                setState(() {});
-              } else if (value == 'tl') {
-                localeProvider.setLocale(const Locale('tl', ''));
-                // Also update TFLite service locale
-                final tfliteService = TFLiteService();
-                tfliteService.currentLocale = const Locale('tl', '');
-                // Force refresh UI
-                setState(() {});
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'en',
-                child: Row(
-                  children: [
-                    if (localeProvider.locale.languageCode == 'en')
-                      const Icon(Icons.check, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(localizations.english),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'tl',
-                child: Row(
-                  children: [
-                    if (localeProvider.locale.languageCode == 'tl')
-                      const Icon(Icons.check, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(localizations.filipino),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            icon: const Icon(Icons.language),
-            tooltip: localizations.selectLanguage,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -316,65 +266,34 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
                         ),
                       ),
 
-                    // Image selection buttons
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    // Enhanced Image selection with photography tips
+                    if (!hasSelectedImage) 
+                      FarmerImagePicker(
+                        onCameraPressed: () => _pickImage(ImageSource.camera),
+                        onGalleryPressed: () => _pickImage(ImageSource.gallery),
+                        isLoading: _isLoading,
+                        helpText: localizations.selectImage,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.eco, color: Colors.green),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    localizations.deficiencyDetection,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              localizations.selectImage,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            const SizedBox(height: 24),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _buildImageSourceButton(
-                                  icon: Icons.photo_library,
-                                  label: localizations.gallery,
-                                  onPressed: () =>
-                                      _pickImage(ImageSource.gallery),
-                                ),
-                                _buildImageSourceButton(
-                                  icon: Icons.camera_alt,
-                                  label: localizations.camera,
-                                  onPressed: () =>
-                                      _pickImage(ImageSource.camera),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
 
                     const SizedBox(height: 16),
 
-                    // Selected image display
+                    // Enhanced selected image display
                     if (hasSelectedImage) ...[
-                      _buildImageDisplay(localizations),
+                      FarmerImageDisplay(
+                        imageSource: kIsWeb ? _selectedImageBytes : _selectedImageFile,
+                        deficiencyType: _analysisResult?.deficiencyType,
+                        confidence: _analysisResult?.confidence ?? 0.0,
+                        onRetake: () {
+                          setState(() {
+                            _selectedImageFile = null;
+                            _selectedImageBytes = null;
+                            _analysisResult = null;
+                            _errorMessage = null;
+                          });
+                        },
+                        onAnalyze: _analyzeImage,
+                        isAnalyzing: _isLoading,
+                      ),
                       const SizedBox(height: 16),
                     ],
 
@@ -389,98 +308,5 @@ class _DeficiencyDetectionScreenState extends State<DeficiencyDetectionScreen> {
   }
 
   // Build the appropriate image display widget based on platform
-  Widget _buildImageDisplay(AppLocalizations localizations) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade700, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.offline_bolt, color: Colors.green.shade800),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Analysis will be performed directly on your device',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: kIsWeb
-                  ? Image.memory(
-                      _selectedImageBytes!,
-                      height: 250,
-                      fit: BoxFit.cover,
-                    )
-                  : Image.file(
-                      _selectedImageFile!,
-                      height: 250,
-                      fit: BoxFit.cover,
-                    ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _analyzeImage,
-              icon: const Icon(
-                Icons.search,
-                size: 24,
-              ),
-              label: Text(
-                localizations.analyze,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildImageSourceButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return Column(
-      children: [
-        ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            shape: const CircleBorder(),
-            padding: const EdgeInsets.all(16),
-            backgroundColor: Colors.green.shade600,
-          ),
-          child: Icon(icon, size: 30, color: Colors.white),
-        ),
-        const SizedBox(height: 8),
-        Text(label),
-      ],
-    );
-  }
 }

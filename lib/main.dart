@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 // google_fonts is applied in the theme file; main doesn't need a direct import
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
@@ -18,7 +19,13 @@ import 'widgets/farmer_language_selector.dart';
 // Remove global key - it's causing duplication issues
 // Use a navigation service singleton instead
 
-void main() {
+Future<void> main() async {
+  // Ensure Flutter bindings are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load .env file
+  await dotenv.load(fileName: '.env');
+  
   // Validate configuration before starting the app
   try {
     AppConfig.validateConfig();

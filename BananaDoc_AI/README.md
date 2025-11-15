@@ -6,24 +6,43 @@ This project uses machine learning to detect nutrient deficiencies in banana pla
 
 ```
 BananaDoc_AI/
-├── model/                  # Model training and testing
-│   ├── train_model.py      # Script to train the model
-│   ├── test_model.py       # Script to test the model on images
-│   └── class_mapping.txt   # Generated mapping of class indices to names
-│
-├── api/                    # API server for model predictions
+├── api/                    # API server for model predictions (RUNTIME)
 │   └── banana_deficiency_api.py  # Flask API to serve model predictions
 │
-├── utils/                  # Utility functions
+├── utils/                  # Utility functions (RUNTIME)
 │   ├── image_preprocessor.py     # Image preprocessing utilities
 │   ├── model_loader.py           # Model loading utilities
-│   └── deficiency_info.py        # Deficiency information provider
+│   ├── deficiency_info.py        # Deficiency information provider
+│   └── gemini_handler.py         # Gemini AI chatbot handler
+│
+├── models_runtime/         # Trained models used by the app (RUNTIME)
+│   ├── banana_nutrient_model.h5
+│   ├── banana_nutrient_model.keras
+│   ├── banana_nutrient_model.tflite
+│   ├── banana_mobile_model.tflite
+│   └── class_mapping.txt
+│
+├── training/               # Model training scripts (DEVELOPMENT ONLY)
+│   ├── train_model.py      # Script to train the model
+│   ├── create_mobile_model.py
+│   ├── compare_models.py
+│   └── README.md           # Training documentation
+│
+├── data/                   # Runtime data storage
+│   └── conversation_context.json
 │
 ├── docs/                   # Documentation
-│   └── README.md           # Detailed documentation
+│   ├── developer_guide.md
+│   └── nutrient_deficiency_model_README.md
 │
 └── requirements.txt        # Python dependencies
 ```
+
+### Directory Separation
+
+- **Runtime Code** (`api/`, `utils/`, `models_runtime/`): Code and models needed for the app to run
+- **Training Code** (`training/`): Scripts for developing and training new models
+- **Documentation** (`docs/`): Project documentation
 
 ## Setup and Usage
 
@@ -37,42 +56,43 @@ pip install -r requirements.txt
 
 ### Training the Model
 
-1. Navigate to the project directory
-2. Run the training script:
+⚠️ **Note**: Training scripts are in the `training/` directory. See `training/README.md` for detailed instructions.
+
+1. Prepare your training dataset (see `training/README.md`)
+2. Navigate to the training directory:
 
 ```bash
-cd model
+cd training
 python train_model.py
 ```
 
-This will:
-- Load the banana leaf images from the dataset
-- Train a MobileNetV2-based model
-- Save the model as `banana_nutrient_model.h5` and `banana_nutrient_model.tflite`
-- Save the class mapping as `class_mapping.txt`
-- Generate a training history plot as `training_history.png`
+After training, copy the models to `models_runtime/`:
+
+```bash
+cp banana_nutrient_model.* ../models_runtime/
+cp class_mapping.txt ../models_runtime/
+```
 
 ### Testing the Model
 
-Test the model on individual images:
-
-```bash
-cd model
-python test_model.py path/to/image.jpg
-```
-
-This will display the image with the prediction and provide detailed information about the detected deficiency.
+Test the model on individual images using the API (see "Running the API Server" below).
 
 ### Running the API Server
 
 Start the Flask API server:
 
 ```bash
+python run_api.py
+```
+
+Or directly:
+
+```bash
 cd api
 python banana_deficiency_api.py
 ```
 
-The server will start on `localhost:5000` with the following endpoints:
+The server will start on `localhost:5002` (default) with the following endpoints:
 
 - **POST /predict**: Analyze an image and return the deficiency prediction
 - **GET /health**: Check if the API is healthy

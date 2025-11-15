@@ -39,11 +39,13 @@ Farmer's query: $description
 ''';
 
     try {
-      debugPrint('Making API call to: $apiUrl');
-
+      // Security: API key in headers, not URL query params
       final response = await http.post(
-        Uri.parse('$apiUrl?key=$apiKey'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(apiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey, // Use header instead of query param
+        },
         body: jsonEncode({
           'contents': [
             {

@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 class ModelLoader:
-    def __init__(self, model_dir='../model'):
+    def __init__(self, model_dir='../models_runtime'):
         """
         Initialize the model loader
         

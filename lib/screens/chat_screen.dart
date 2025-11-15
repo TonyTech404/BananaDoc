@@ -34,6 +34,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final LLMService _llmService = LLMService();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  bool _isLoadingInitialMessages =
+      true; // Track if initial messages are loading
 
   late LeafAnalysisResult? _currentAnalysis;
 
@@ -54,13 +56,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Set the locale for LLMService before generating initial messages
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
+      final localeProvider =
+          Provider.of<LocaleProvider>(context, listen: false);
       _llmService.currentLocale = localeProvider.locale;
       _addInitialMessages();
     });
   }
 
   void _addInitialMessages() async {
+    // Disable auto-scroll during initial message loading
+    _isLoadingInitialMessages = true;
+
     if (widget.initialMessage != null) {
       setState(() {
         _messages.add(
@@ -158,12 +164,20 @@ class _ChatScreenState extends State<ChatScreen> {
         _updateConversationHistory("AI", welcomeMessage);
       });
     }
+
+    // Mark initial messages as done loading - now auto-scroll can work for user messages
+    setState(() {
+      _isLoadingInitialMessages = false;
+    });
   }
 
   void _handleSubmitted(String text) async {
     _textController.clear();
 
     if (text.trim().isEmpty) return;
+
+    // Check if user is near the bottom before adding message
+    final bool wasNearBottom = _isNearBottom();
 
     setState(() {
       _messages.add(
@@ -177,9 +191,13 @@ class _ChatScreenState extends State<ChatScreen> {
       _updateConversationHistory("User", text);
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
+    // Only auto-scroll if user was already near the bottom AND initial messages are done loading
+    // This prevents auto-scrolling during initial message loading
+    if (wasNearBottom && !_isLoadingInitialMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    }
 
     // Create rich context info that includes:
     // 1. Language preference
@@ -192,7 +210,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final isTagalog = localeProvider.locale.languageCode == 'tl';
     contextInfo = "LANGUAGE PREFERENCE:\n";
     if (isTagalog) {
-      contextInfo += "User prefers TAGALOG/FILIPINO responses. ALL responses must be in Tagalog. Do not mix English.\n\n";
+      contextInfo +=
+          "User prefers TAGALOG/FILIPINO responses. ALL responses must be in Tagalog. Do not mix English.\n\n";
     } else {
       contextInfo += "User prefers ENGLISH responses.\n\n";
     }
@@ -224,6 +243,9 @@ class _ChatScreenState extends State<ChatScreen> {
       context: contextInfo,
     );
 
+    // Check if user is near the bottom before adding response (reuse the variable from earlier)
+    final bool stillNearBottom = _isNearBottom();
+
     setState(() {
       _messages.add(
         ChatMessage(
@@ -236,9 +258,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _updateConversationHistory("AI", answer);
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
-    });
+    // Only auto-scroll if user was already near the bottom (reading new messages)
+    // This prevents jumping to bottom when user is reading older messages
+    // Also ensure initial messages are done loading
+    if (stillNearBottom && !_isLoadingInitialMessages) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    }
   }
 
   // Update conversation history with new messages
@@ -247,6 +274,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _conversationHistory += "$speaker: $message\n\n";
     debugPrint(
         "Conversation history updated, new length: ${_conversationHistory.length}");
+  }
+
+  // Check if user is near the bottom of the chat (within 50 pixels - stricter check)
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients)
+      return false; // Don't auto-scroll if controller not ready
+    final position = _scrollController.position;
+    final maxScroll = position.maxScrollExtent;
+    final currentScroll = position.pixels;
+    // Consider "near bottom" only if within 50 pixels of the bottom (stricter)
+    // This ensures user is actually at the bottom, not just "close"
+    return (maxScroll - currentScroll) < 50;
   }
 
   void _scrollToBottom() {
@@ -469,9 +508,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 Text(
-                  isTagalog 
-                      ? 'Nag-iisip ang AI...'
-                      : 'AI is thinking...',
+                  isTagalog ? 'Nag-iisip ang AI...' : 'AI is thinking...',
                   style: TextStyle(
                     fontStyle: FontStyle.italic,
                     color: Colors.grey[600],
@@ -483,7 +520,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
                   ),
                 ),
               ],

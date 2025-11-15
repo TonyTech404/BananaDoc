@@ -1,14 +1,12 @@
 import 'dart:math' show max;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class LLMService {
-  // For demo purposes, we'll use a simple API endpoint.
-  // In production, you would use your actual LLM API (OpenAI, Anthropic, etc.)
-  static const String _baseUrlMobile = 'http://localhost:5002';
-  static const String _baseUrlWeb = 'http://127.0.0.1:5002';
-
-  static String get baseUrl => kIsWeb ? _baseUrlWeb : _baseUrlMobile;
+  // Use environment-based configuration
+  static String get baseUrl => AppConfig.apiBaseUrl;
   static String get chatEndpoint => '$baseUrl/chat';
 
   // Track the current locale
@@ -19,8 +17,9 @@ class LLMService {
       String deficiencyType, double confidence) async {
     try {
       // Add realistic thinking delay for explanation generation
-      await _simulateThinkingDelay('deficiency explanation for $deficiencyType');
-      
+      await _simulateThinkingDelay(
+          'deficiency explanation for $deficiencyType');
+
       // In a real app, you would call your LLM API here
       // For now, let's simulate with static content based on the current locale
       if (currentLocale?.languageCode == 'tl') {
@@ -95,10 +94,11 @@ class LLMService {
   Future<String> getTreatmentRecommendation(String deficiencyType) async {
     try {
       debugPrint('Getting treatment recommendation for $deficiencyType');
-      
+
       // Add realistic thinking delay for treatment generation
-      await _simulateThinkingDelay('treatment recommendation for $deficiencyType');
-      
+      await _simulateThinkingDelay(
+          'treatment recommendation for $deficiencyType');
+
       // In a real app, you would call your LLM API here
 
       // Always use the full, uninterrupted treatment text
@@ -120,6 +120,67 @@ class LLMService {
     }
   }
 
+  // Call the backend chat API endpoint
+  Future<String?> _callBackendChatAPI(String question, String? context) async {
+    try {
+      // Prepare headers with API key for authentication
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+
+      // Add backend API key if available
+      final backendApiKey = AppConfig.backendApiKey;
+      if (backendApiKey.isNotEmpty) {
+        headers['X-API-Key'] = backendApiKey;
+      }
+
+      // Build the query - include context if available
+      String fullQuery = question;
+      if (context != null && context.isNotEmpty) {
+        // Include context in the query for better responses
+        fullQuery = '$context\n\nUser question: $question';
+      }
+
+      debugPrint('Calling backend chat API at: $chatEndpoint');
+      debugPrint('Query length: ${fullQuery.length}');
+
+      // Make API request
+      final response = await http
+          .post(
+            Uri.parse(chatEndpoint),
+            headers: headers,
+            body: jsonEncode({
+              'query': fullQuery,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      debugPrint('Backend API response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final apiResponse = jsonResponse['response'] as String?;
+
+        if (apiResponse != null && apiResponse.isNotEmpty) {
+          debugPrint(
+              'Backend API response received (${apiResponse.length} chars)');
+          return apiResponse;
+        } else {
+          debugPrint('Backend API returned empty response');
+          return null;
+        }
+      } else {
+        debugPrint(
+            'Backend API error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'API Error: ${response.statusCode} - ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error calling backend chat API: $e');
+      rethrow;
+    }
+  }
+
   // For answering farmer questions with improved context awareness
   Future<String> answerFarmerQuestion(String deficiencyType, String question,
       {String? context}) async {
@@ -128,7 +189,20 @@ class LLMService {
       debugPrint('Question: $question');
       debugPrint('Context available: ${context != null && context.isNotEmpty}');
 
-      // Add realistic thinking delay before processing
+      // Try to call the backend API first
+      try {
+        final response = await _callBackendChatAPI(question, context);
+        if (response != null && response.isNotEmpty) {
+          debugPrint('Successfully received response from backend API');
+          return response;
+        }
+      } catch (e) {
+        debugPrint(
+            'Backend API call failed, falling back to local responses: $e');
+        // Fall through to fallback responses
+      }
+
+      // Add realistic thinking delay before processing (for fallback)
       await _simulateThinkingDelay(question);
 
       // Check if question is in Tagalog/Filipino
@@ -152,7 +226,8 @@ class LLMService {
             question.toLowerCase().contains("anong fertilizer") ||
             question.toLowerCase().contains("anong pataba") ||
             question.toLowerCase().contains("ano ang pataba") ||
-            (question.toLowerCase().contains("kailangan") && question.toLowerCase().contains("pataba"))) {
+            (question.toLowerCase().contains("kailangan") &&
+                question.toLowerCase().contains("pataba"))) {
           debugPrint('Is follow-up question: true (fertilizer question)');
 
           switch (deficiencyType) {
@@ -294,7 +369,8 @@ class LLMService {
             question.toLowerCase().contains("anong fertilizer") ||
             question.toLowerCase().contains("anong pataba") ||
             question.toLowerCase().contains("ano ang pataba") ||
-            question.toLowerCase().contains("kailangan") && question.toLowerCase().contains("pataba")) {
+            question.toLowerCase().contains("kailangan") &&
+                question.toLowerCase().contains("pataba")) {
           debugPrint('Is follow-up question: true (fertilizer question)');
 
           switch (deficiencyType) {
@@ -478,7 +554,8 @@ class LLMService {
       // Fall back to standard responses if no context
       if (deficiencyType.isNotEmpty &&
           _isSimpleActionQuestion(question, isTagalog)) {
-        debugPrint('Simple action question detected, providing treatment answer');
+        debugPrint(
+            'Simple action question detected, providing treatment answer');
         return _generateSpecificTreatmentAnswer(deficiencyType, isTagalog);
       }
 
@@ -496,7 +573,8 @@ class LLMService {
   // Generate a contextual answer based on deficiency, question, and conversation history
   String _generateContextualAnswer(
       String deficiency, String question, String context, bool isTagalog) {
-    debugPrint('Generating contextual answer for $deficiency question: $question');
+    debugPrint(
+        'Generating contextual answer for $deficiency question: $question');
     debugPrint('Context length: ${context.length}');
 
     // Extract key information from the context
@@ -513,15 +591,14 @@ class LLMService {
     //     context.toLowerCase().contains('sanhi') ||
     //     context.toLowerCase().contains('bakit');
 
-
-
     // IMPROVED: Check for common follow-up patterns that indicate continuation of a conversation
     bool isFollowUpQuestion = _isFollowUpQuestion(question, isTagalog);
     debugPrint('Is follow-up question: $isFollowUpQuestion');
 
     // For simple follow-up questions, ensure we maintain reference to the deficiency
     if (isFollowUpQuestion) {
-      debugPrint('Handling follow-up question with reinforced context awareness');
+      debugPrint(
+          'Handling follow-up question with reinforced context awareness');
       return _generateSpecificTreatmentAnswer(deficiency, isTagalog);
     }
 
@@ -1324,21 +1401,21 @@ class LLMService {
   Future<void> _simulateThinkingDelay(String question) async {
     // Base delay of 1-2 seconds to simulate AI processing
     int baseDelayMs = 1000 + (question.length * 10).clamp(0, 1000);
-    
+
     // Add some randomness to make it feel more natural (±500ms)
     int randomVariation = (DateTime.now().millisecondsSinceEpoch % 1000) - 500;
     int totalDelay = (baseDelayMs + randomVariation).clamp(800, 3000);
-    
+
     // For complex questions (longer text), add a bit more delay
     if (question.length > 50) {
       totalDelay += 500;
     }
-    
+
     // Questions with multiple parts get extra delay
     if (question.contains('?') && question.split('?').length > 2) {
       totalDelay += 300;
     }
-    
+
     debugPrint('Simulating AI thinking for ${totalDelay}ms...');
     await Future.delayed(Duration(milliseconds: totalDelay));
   }

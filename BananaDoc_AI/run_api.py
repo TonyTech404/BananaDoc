@@ -24,7 +24,7 @@ def check_model_exists():
     
     return True
 
-def run_api_server(host='0.0.0.0', port=5000):
+def run_api_server(host='127.0.0.1', port=5002):
     """Run the API server"""
     api_script_path = os.path.join('api', 'banana_deficiency_api.py')
     
@@ -33,15 +33,29 @@ def run_api_server(host='0.0.0.0', port=5000):
         return False
     
     try:
+        # Load environment variables from .env if it exists
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            print("Warning: python-dotenv not installed. Install it to use .env files.")
+        
         # Set environment variables
         env = os.environ.copy()
         env['FLASK_APP'] = api_script_path
-        env['FLASK_ENV'] = 'development'
+        env['FLASK_ENV'] = env.get('FLASK_ENV', 'development')
         env['PORT'] = str(port)
+        env['HOST'] = host
+        
+        # Security: Warn if using 0.0.0.0
+        if host == '0.0.0.0':
+            print("WARNING: Server is binding to 0.0.0.0 (all interfaces).")
+            print("Ensure proper firewall rules are in place.")
         
         # Run the API server
         cmd = [sys.executable, api_script_path]
         print(f"Starting API server at http://{host}:{port}")
+        print(f"Environment: {env.get('FLASK_ENV', 'development')}")
         subprocess.run(cmd, env=env)
         return True
     except Exception as e:
@@ -51,8 +65,8 @@ def run_api_server(host='0.0.0.0', port=5000):
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description='Run the BananaDoc AI API server')
-    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to bind to')
-    parser.add_argument('--port', type=int, default=5002, help='Port to bind to')
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host to bind to (default: 127.0.0.1)')
+    parser.add_argument('--port', type=int, default=5002, help='Port to bind to (default: 5002)')
     parser.add_argument('--skip-checks', action='store_true', help='Skip model file checks')
     
     args = parser.parse_args()

@@ -6,17 +6,16 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/leaf_analysis_result.dart';
+import '../config/app_config.dart';
 
 class NutrientDeficiencyService {
-  // URLs for different platforms
-  static const String _baseUrlMobile = 'http://localhost:5002';
-  static const String _baseUrlWeb =
-      'http://127.0.0.1:5002'; // Use IP instead of localhost for web
-
-  // Get appropriate URL based on platform
-  static String get baseUrl => kIsWeb ? _baseUrlWeb : _baseUrlMobile;
+  // Use environment-based configuration
+  static String get baseUrl => AppConfig.apiBaseUrl;
   static String get apiUrl => '$baseUrl/predict';
   static String get healthUrl => '$baseUrl/health';
+
+  // Get API key for backend authentication
+  static String get apiKey => AppConfig.backendApiKey;
 
   // Track current locale
   Locale? currentLocale;
@@ -25,9 +24,19 @@ class NutrientDeficiencyService {
   Future<bool> isApiAvailable() async {
     try {
       debugPrint('Checking API at $healthUrl');
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+
+      // Add API key if available
+      if (apiKey.isNotEmpty) {
+        headers['X-API-Key'] = apiKey;
+      }
+
       final response = await http
           .get(
             Uri.parse(healthUrl),
+            headers: headers,
           )
           .timeout(const Duration(seconds: 5));
 
@@ -70,10 +79,20 @@ class NutrientDeficiencyService {
 
   // Common method to send API request
   Future<LeafAnalysisResult> _sendAnalysisRequest(String base64Image) async {
+    // Prepare headers with API key for authentication
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+
+    // Add API key if available
+    if (apiKey.isNotEmpty) {
+      headers['X-API-Key'] = apiKey;
+    }
+
     // Make API request
     final response = await http.post(
       Uri.parse(apiUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode({
         'image': base64Image,
       }),

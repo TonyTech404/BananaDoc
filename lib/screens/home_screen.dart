@@ -36,6 +36,16 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // Check if user is near the bottom of the chat (within 200 pixels)
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients) return true;
+    final position = _scrollController.position;
+    final maxScroll = position.maxScrollExtent;
+    final currentScroll = position.pixels;
+    // Consider "near bottom" if within 200 pixels of the bottom
+    return (maxScroll - currentScroll) < 200;
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -112,8 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
             response = await _llmService.answerFarmerQuestion(
                 chatService.currentDeficiency,
                 "why do plants have "
-                    "${chatService.currentDeficiency}"
-                    " deficiency?",
+                "${chatService.currentDeficiency}"
+                " deficiency?",
                 context: conversationContext);
           }
           // For prevention questions
@@ -123,13 +133,14 @@ class _HomeScreenState extends State<HomeScreen> {
             response = await _llmService.answerFarmerQuestion(
                 chatService.currentDeficiency,
                 "how to prevent "
-                    "${chatService.currentDeficiency}"
-                    " deficiency?",
+                "${chatService.currentDeficiency}"
+                " deficiency?",
                 context: conversationContext);
           }
           // For any other follow-up questions, send with context
           else {
-            debugPrint('FOLLOW-UP QUESTION: Using enhanced contextual handling');
+            debugPrint(
+                'FOLLOW-UP QUESTION: Using enhanced contextual handling');
             // Specifically craft the prompt to maintain context
             String enhancedMessage = locale.languageCode == 'tl'
                 ? "Tungkol sa ${chatService.currentDeficiency} deficiency: $message"
@@ -193,7 +204,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
       });
 
-      _scrollToBottom();
+      // Only auto-scroll if user is near the bottom (reading new messages)
+      if (_isNearBottom()) {
+        _scrollToBottom();
+      }
     } catch (e) {
       debugPrint('Error in HomeScreen: $e');
 

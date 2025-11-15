@@ -51,6 +51,23 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Python Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
 # Large model files (>100MB should use Git LFS)
 *.keras
 *.h5
@@ -64,3 +81,26 @@ app.*.map.json
 BananaDoc_AI/model/simple_banana_model.keras
 BananaDoc_AI/model/banana_nutrient_model.keras
 BananaDoc_AI/model/banana_nutrient_model.h5
+
+# Build artifacts
+**/build/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Test files (optional - uncomment if you want to ignore test files)
+# **/test_*.py
+# **/*_test.py
+
+# Training data (large dataset - not needed for app runtime)
+Images of Nutrient Deficient Banana Plant Leaves/
+**/Images of Nutrient Deficient Banana Plant Leaves/
+
+# Training scripts and artifacts (development only)
+BananaDoc_AI/training/*.png
+BananaDoc_AI/training/finetuned_mobile_model.keras
+
+# Runtime models (these are tracked in git)
+# BananaDoc_AI/models_runtime/*.h5
+# BananaDoc_AI/models_runtime/*.keras
+# BananaDoc_AI/models_runtime/*.tflite

@@ -268,11 +268,14 @@ class GeminiHandler:
             
             # Generate response using the model
             # Configure generation parameters for consistent, context-aware responses
+            # Increased max_output_tokens to allow for longer, more detailed responses
+            # Gemini 2.5-flash supports up to 8192 output tokens
+            # Using 8192 to allow for very detailed responses (cost estimates, treatments, etc.)
             generation_config = {
                 'temperature': 0.7,
                 'top_p': 0.9,
                 'top_k': 40,
-                'max_output_tokens': 1024,
+                'max_output_tokens': 8192,  # Increased from 1024 to 8192 (max for flash models) to prevent truncation
             }
             
             response = self.model.generate_content(
@@ -280,8 +283,20 @@ class GeminiHandler:
                 generation_config=generation_config
             )
             
-            # Extract the text response
+            # Extract the text response - handle potential truncation
             llm_response = response.text.strip()
+            
+            # Check if response was truncated due to token limit
+            if hasattr(response, 'candidates') and response.candidates:
+                finish_reason = response.candidates[0].finish_reason
+                if finish_reason == 'MAX_TOKENS':
+                    print(f"Warning: Response may have been truncated due to max_output_tokens limit")
+                    # Could append a note, but for now just log it
+                elif finish_reason:
+                    print(f"Response finish reason: {finish_reason}")
+            
+            # Log response length for debugging
+            print(f"Generated response length: {len(llm_response)} characters")
             
             # Save this conversation turn
             self.context_manager.add_conversation_turn(user_query, llm_response)

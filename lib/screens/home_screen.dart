@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import '../services/gemini_service.dart';
 import '../models/chat_message.dart';
 import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
@@ -21,11 +21,30 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   final LLMService _llmService = LLMService();
 
+  // Use local messages for general chat (like chat_screen does)
+  final List<ChatMessage> _localMessages = [];
+  String _conversationHistory = ""; // Track conversation for context
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final localeProvider =
+          Provider.of<LocaleProvider>(context, listen: false);
+      _llmService.currentLocale = localeProvider.locale;
+
+      // Clear backend server context for fresh start
+      await _llmService.clearBackendContext();
+
+      // For general chat, start with empty local messages (fresh session)
+      // Only use ChatHistoryService for deficiency-specific chats
+      final chatService =
+          Provider.of<ChatHistoryService>(context, listen: false);
+      if (chatService.currentDeficiency.isEmpty) {
+        // General chat - use local messages, start fresh
+        _localMessages.clear();
+        _conversationHistory = "";
+      }
     });
   }
 
@@ -36,14 +55,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // Check if user is near the bottom of the chat (within 200 pixels)
+  // Check if user is near the bottom of the chat (within 50 pixels - stricter like chat_screen)
   bool _isNearBottom() {
-    if (!_scrollController.hasClients) return true;
+    if (!_scrollController.hasClients) return false;
     final position = _scrollController.position;
     final maxScroll = position.maxScrollExtent;
     final currentScroll = position.pixels;
-    // Consider "near bottom" if within 200 pixels of the bottom
-    return (maxScroll - currentScroll) < 200;
+    // Consider "near bottom" only if within 50 pixels (stricter check)
+    return (maxScroll - currentScroll) < 50;
   }
 
   void _scrollToBottom() {
@@ -58,42 +77,52 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // Update conversation history (like chat_screen does)
+  void _updateConversationHistory(String speaker, String message) {
+    _conversationHistory += "$speaker: $message\n\n";
+  }
+
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
     final chatService = Provider.of<ChatHistoryService>(context, listen: false);
+    final locale = Provider.of<LocaleProvider>(context, listen: false).locale;
+    _llmService.currentLocale = locale;
 
-    // Debug output for diagnostics
-    debugPrint('====== SENDING MESSAGE ======');
-    debugPrint('Message: $message');
-    debugPrint('Current deficiency: ${chatService.currentDeficiency}');
-    debugPrint('Has context: ${chatService.messages.isNotEmpty}');
-    debugPrint('Message count: ${chatService.messages.length}');
+    // Check if user is near bottom before adding message
+    final bool wasNearBottom = _isNearBottom();
 
-    // Add user message to history
-    chatService.addMessage(ChatMessage(
-      text: message,
-      isUser: true,
-    ));
+    // Add user message - use local messages for general chat, ChatHistoryService for deficiency chat
+    if (chatService.currentDeficiency.isEmpty) {
+      // General chat - use local messages
+      setState(() {
+        _localMessages.add(ChatMessage(text: message, isUser: true));
+        _isLoading = true;
+      });
+      _updateConversationHistory("User", message);
+    } else {
+      // Deficiency chat - use ChatHistoryService
+      chatService.addMessage(ChatMessage(text: message, isUser: true));
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
-    setState(() {
-      _isLoading = true;
-      _messageController.clear();
-    });
+    _messageController.clear();
 
-    _scrollToBottom();
+    // Auto-scroll if near bottom
+    if (wasNearBottom) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    }
 
     try {
       String response;
-      // Set the current locale in the LLM service
-      final locale = Provider.of<LocaleProvider>(context, listen: false).locale;
-      _llmService.currentLocale = locale;
-      debugPrint('Current locale: ${locale.languageCode}');
 
-      // CRITICAL FIX: Handling simple questions about deficiencies directly
-      // without going through external APIs
       if (chatService.currentDeficiency.isNotEmpty) {
+        // Deficiency-specific chat - use ChatHistoryService
         // Get the full conversation context - this is critical for follow-up questions
         final conversationContext = chatService.getContext();
         debugPrint(
@@ -158,35 +187,75 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         debugPrint('RESPONSE LENGTH: ${response.length}');
-      } else {
-        // For initial analysis when no deficiency is identified yet
-        debugPrint('NO DEFICIENCY DETECTED YET: Using general analysis');
-        final localeProvider =
-            Provider.of<LocaleProvider>(context, listen: false);
-        final GeminiService geminiService = GeminiService();
 
-        final analysisResult = await geminiService.analyzeLeafCondition(
-          description: message,
-          locale: localeProvider.locale,
+        // Add response to ChatHistoryService
+        chatService.addMessage(ChatMessage(text: response, isUser: false));
+      } else {
+        // General chat - build context like chat_screen does
+        debugPrint('GENERAL CHAT: Using backend chat server');
+        debugPrint('Current locale: ${locale.languageCode}');
+
+        // Build context similar to chat_screen - language preference FIRST and VERY prominent
+        final isTagalog = locale.languageCode == 'tl';
+
+        // Build the full query with language preference at the very top
+        String fullQuery = "";
+
+        // CRITICAL: Put language instruction FIRST and make it VERY prominent
+        if (isTagalog) {
+          fullQuery = "⚠️ CRITICAL LANGUAGE REQUIREMENT - READ THIS FIRST ⚠️\n"
+              "==================================================\n"
+              "USER LANGUAGE PREFERENCE: TAGALOG/FILIPINO\n"
+              "MANDATORY INSTRUCTION: ALL your responses MUST be EXCLUSIVELY in Tagalog/Filipino.\n"
+              "DO NOT use any English words.\n"
+              "DO NOT mix languages.\n"
+              "DO NOT translate Tagalog terms to English.\n"
+              "RESPOND ONLY IN TAGALOG/FILIPINO LANGUAGE.\n"
+              "==================================================\n\n";
+        } else {
+          fullQuery = "⚠️ CRITICAL LANGUAGE REQUIREMENT - READ THIS FIRST ⚠️\n"
+              "==================================================\n"
+              "USER LANGUAGE PREFERENCE: ENGLISH\n"
+              "MANDATORY INSTRUCTION: ALL your responses MUST be EXCLUSIVELY in English.\n"
+              "DO NOT use any Tagalog/Filipino words.\n"
+              "DO NOT mix languages.\n"
+              "RESPOND ONLY IN ENGLISH LANGUAGE.\n"
+              "==================================================\n\n";
+        }
+
+        // Add conversation history if available
+        if (_conversationHistory.isNotEmpty) {
+          fullQuery += "CONVERSATION HISTORY:\n$_conversationHistory\n\n";
+        }
+
+        // Add the user's question
+        fullQuery += "User question: $message";
+
+        debugPrint('Full query length: ${fullQuery.length} chars');
+        debugPrint('Language preference: ${isTagalog ? "Tagalog" : "English"}');
+
+        // Use LLMService which will call the backend chat API
+        // Pass the full query (with language preference at top) as the question
+        // This ensures language preference is prioritized
+        _llmService.currentLocale = locale;
+
+        // Call answerFarmerQuestion with the full query as context
+        // The backend will receive: context + question, so language preference will be first
+        response = await _llmService.answerFarmerQuestion(
+          'unknown',
+          message,
+          context: fullQuery,
         );
 
-        // CRITICAL: If Gemini detected a deficiency, IMMEDIATELY set it
-        String detectedDeficiency = analysisResult.deficiencyType;
-        if (detectedDeficiency.isNotEmpty && detectedDeficiency != 'Unknown') {
-          debugPrint('SETTING DEFICIENCY FROM ANALYSIS: $detectedDeficiency');
-          chatService.setDeficiency(detectedDeficiency);
+        debugPrint('Response received, length: ${response.length}');
+        debugPrint(
+            'Response preview: ${response.substring(0, response.length > 100 ? 100 : response.length)}');
 
-          // Since we now know the deficiency, provide a proper explanation
-          String explanation = await _llmService.getDeficiencyExplanation(
-              detectedDeficiency, analysisResult.confidence);
-          String treatment =
-              await _llmService.getTreatmentRecommendation(detectedDeficiency);
-
-          // Combine diagnosis with treatment
-          response = '$explanation\n\n$treatment';
-        } else {
-          response = analysisResult.diagnosis;
-        }
+        // Add response to local messages
+        setState(() {
+          _localMessages.add(ChatMessage(text: response, isUser: false));
+        });
+        _updateConversationHistory("AI", response);
       }
 
       // Debug print final response
@@ -194,43 +263,66 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint(
           response.substring(0, response.length > 100 ? 100 : response.length));
 
-      // Add assistant response to history
-      chatService.addMessage(ChatMessage(
-        text: response,
-        isUser: false,
-      ));
-
       setState(() {
         _isLoading = false;
       });
 
       // Only auto-scroll if user is near the bottom (reading new messages)
-      if (_isNearBottom()) {
-        _scrollToBottom();
+      final bool stillNearBottom = _isNearBottom();
+      if (stillNearBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
       }
     } catch (e) {
       debugPrint('Error in HomeScreen: $e');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error stack: ${StackTrace.current}');
 
-      String errorMessage = e.toString();
-      if (errorMessage.contains('Failed to analyze leaf condition')) {
-        if (mounted) {
-          final locale =
-              Provider.of<LocaleProvider>(context, listen: false).locale;
-          if (locale.languageCode == 'tl') {
-            errorMessage =
-                'Paumanhin, nagkaroon ng problema sa koneksyon sa AI service. Pakisuri ang iyong koneksyon sa internet at subukang muli.';
-          } else {
-            errorMessage =
-                'Sorry, there was a problem connecting to the AI service. Please check your network connection and try again.';
-          }
+      // Get locale for error message
+      final locale = Provider.of<LocaleProvider>(context, listen: false).locale;
+      String errorMessage;
+
+      // Check for various error types and provide appropriate messages
+      final errorString = e.toString().toLowerCase();
+      final isNetworkError = errorString.contains('failed') ||
+          errorString.contains('network') ||
+          errorString.contains('connection') ||
+          errorString.contains('timeout') ||
+          errorString.contains('socket') ||
+          errorString.contains('http') ||
+          errorString.contains('api error');
+
+      if (isNetworkError ||
+          errorString.contains('failed to analyze') ||
+          errorString.contains('api error')) {
+        if (locale.languageCode == 'tl') {
+          errorMessage =
+              'Paumanhin, nagkaroon ng problema sa koneksyon sa AI service. Pakisuri ang iyong koneksyon sa internet at subukang muli.';
+        } else {
+          errorMessage =
+              'Sorry, there was a problem connecting to the AI service. Please check your network connection and try again.';
+        }
+      } else {
+        // Generic error message for other types of errors
+        if (locale.languageCode == 'tl') {
+          errorMessage =
+              'Paumanhin, may naganap na error habang pinoproseso ang iyong mensahe. Pakisubukang muli mamaya.';
+        } else {
+          errorMessage =
+              'Sorry, an error occurred while processing your message. Please try again later.';
         }
       }
 
-      // Add error message to history
-      chatService.addMessage(ChatMessage(
-        text: errorMessage,
-        isUser: false,
-      ));
+      // Add error message
+      if (chatService.currentDeficiency.isEmpty) {
+        setState(() {
+          _localMessages.add(ChatMessage(text: errorMessage, isUser: false));
+        });
+        _updateConversationHistory("AI", errorMessage);
+      } else {
+        chatService.addMessage(ChatMessage(text: errorMessage, isUser: false));
+      }
 
       setState(() {
         _isLoading = false;
@@ -461,12 +553,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final localizations = AppLocalizations.of(context);
     final localeProvider = Provider.of<LocaleProvider>(context, listen: true);
     final chatService = Provider.of<ChatHistoryService>(context, listen: true);
-    final messages = chatService.messages;
 
-    // Create an instance of LLMService
-    final llmService = LLMService();
+    // Use local messages for general chat, ChatHistoryService for deficiency chat
+    final messages = chatService.currentDeficiency.isEmpty
+        ? _localMessages
+        : chatService.messages;
+
     // Update LLMService with current locale
-    llmService.currentLocale = localeProvider.locale;
+    _llmService.currentLocale = localeProvider.locale;
 
     String currentDeficiency = chatService.currentDeficiency;
 
@@ -486,21 +580,36 @@ class _HomeScreenState extends State<HomeScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('selected_language', 'en');
                 // Update LLMService locale
-                llmService.currentLocale = const Locale('en', '');
-                // Force refresh UI
-                setState(() {});
+                _llmService.currentLocale = const Locale('en', '');
+                // Clear local messages and conversation history for fresh start
+                setState(() {
+                  _localMessages.clear();
+                  _conversationHistory = "";
+                });
               } else if (value == 'tl') {
                 localeProvider.setLocale(const Locale('tl', ''));
                 // Update language preference
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setString('selected_language', 'tl');
                 // Update LLMService locale
-                llmService.currentLocale = const Locale('tl', '');
-                // Force refresh UI
-                setState(() {});
+                _llmService.currentLocale = const Locale('tl', '');
+                // Clear local messages and conversation history for fresh start
+                setState(() {
+                  _localMessages.clear();
+                  _conversationHistory = "";
+                });
               } else if (value == 'clear') {
-                chatService.clearMessages();
-                chatService.setDeficiency('');
+                if (chatService.currentDeficiency.isEmpty) {
+                  // Clear local messages for general chat
+                  setState(() {
+                    _localMessages.clear();
+                    _conversationHistory = "";
+                  });
+                } else {
+                  // Clear ChatHistoryService for deficiency chat
+                  chatService.clearMessages();
+                  chatService.setDeficiency('');
+                }
               }
             },
             itemBuilder: (context) => [
@@ -586,11 +695,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
           ),
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Center(
-                child: CircularProgressIndicator(),
-              ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _buildThinkingIndicator(localeProvider),
             ),
           _buildMessageInput(localizations),
         ],
@@ -605,22 +712,82 @@ class _HomeScreenState extends State<HomeScreen> {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+        padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
           color: message.isUser
-              ? Theme.of(context).colorScheme.primary
-              : Colors.grey[200],
-          borderRadius: BorderRadius.circular(16),
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.9)
+              : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(16.0),
         ),
-        child: Text(
-          message.text,
-          style: TextStyle(
-            color: message.isUser ? Colors.white : Colors.black,
-            fontSize: 16,
+        child: message.isUser
+            ? Text(
+                message.text,
+                style: const TextStyle(color: Colors.white),
+              )
+            : MarkdownBody(
+                data: message.text,
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black.withValues(alpha: 0.8),
+                  ),
+                  h1: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
+                  h2: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                  h3: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                  listBullet: TextStyle(
+                    color: Colors.black.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildThinkingIndicator(LocaleProvider localeProvider) {
+    final isTagalog = localeProvider.locale.languageCode == 'tl';
+    return Row(
+      children: [
+        const CircleAvatar(
+          radius: 20,
+          backgroundColor: Color(0xFF4CAF50),
+          child: Icon(Icons.smart_toy, color: Colors.white, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  isTagalog ? 'Nag-iisip ang AI...' : 'AI is thinking...',
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(Colors.grey[400]!),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 

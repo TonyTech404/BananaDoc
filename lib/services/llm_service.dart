@@ -8,6 +8,7 @@ class LLMService {
   // Use environment-based configuration
   static String get baseUrl => AppConfig.apiBaseUrl;
   static String get chatEndpoint => '$baseUrl/chat';
+  static String get clearContextEndpoint => '$baseUrl/clear-context';
 
   // Track the current locale
   Locale? currentLocale;
@@ -135,10 +136,20 @@ class LLMService {
       }
 
       // Build the query - include context if available
-      String fullQuery = question;
+      String fullQuery;
       if (context != null && context.isNotEmpty) {
-        // Include context in the query for better responses
-        fullQuery = '$context\n\nUser question: $question';
+        // If context already contains the user question (like from homepage chat),
+        // use it as-is. Otherwise, append the question.
+        if (context.contains('User question:') ||
+            context.contains('User\'s question:')) {
+          // Context already has the question, use it directly
+          fullQuery = context;
+        } else {
+          // Include context in the query for better responses
+          fullQuery = '$context\n\nUser question: $question';
+        }
+      } else {
+        fullQuery = question;
       }
 
       debugPrint('Calling backend chat API at: $chatEndpoint');
@@ -164,6 +175,13 @@ class LLMService {
         if (apiResponse != null && apiResponse.isNotEmpty) {
           debugPrint(
               'Backend API response received (${apiResponse.length} chars)');
+          // Log a preview to help debug truncation issues
+          if (apiResponse.length > 500) {
+            debugPrint(
+                'Response preview (first 200 chars): ${apiResponse.substring(0, 200)}...');
+            debugPrint(
+                'Response preview (last 200 chars): ...${apiResponse.substring(apiResponse.length - 200)}');
+          }
           return apiResponse;
         } else {
           debugPrint('Backend API returned empty response');
@@ -178,6 +196,38 @@ class LLMService {
     } catch (e) {
       debugPrint('Error calling backend chat API: $e');
       rethrow;
+    }
+  }
+
+  // Clear the backend server's conversation context
+  Future<void> clearBackendContext() async {
+    try {
+      debugPrint('Clearing backend chat context');
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+
+      // Add backend API key if available
+      final backendApiKey = AppConfig.backendApiKey;
+      if (backendApiKey.isNotEmpty) {
+        headers['X-API-Key'] = backendApiKey;
+      }
+
+      final response = await http
+          .post(
+            Uri.parse(clearContextEndpoint),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        debugPrint('Backend context cleared successfully');
+      } else {
+        debugPrint('Failed to clear backend context: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error clearing backend context: $e');
+      // Don't throw - this is not critical
     }
   }
 

@@ -193,6 +193,13 @@ The machine learning model was trained on images of banana leaves showing defici
 
 Plus images of healthy leaves.
 
+## Image of our Project
+<img width="343" height="689" alt="image" src="https://github.com/user-attachments/assets/a5d8eab4-4f1f-409b-a1ab-efe5cf11a8de" />
+
+
+## Video demo of the Project
+https://drive.google.com/file/d/1wTVHkPJ-G0bRKLdhjYB6v9epY1ql4kNR/view?usp=sharing
+
 ## License
 
 This project is licensed under the MIT License.

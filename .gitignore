@@ -19,6 +19,11 @@ migrate_working_dir/
 .env.development
 config.js
 
+# Firebase sensitive configuration
+firebase_config.json
+BananaDoc_AI/firebase_config.json
+**/firebase_config.json
+
 # IntelliJ related
 *.iml
 *.ipr

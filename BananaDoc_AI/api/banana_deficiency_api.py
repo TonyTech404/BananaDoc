@@ -57,6 +57,10 @@ from utils.gemini_handler import GeminiHandler
 
 app = Flask(__name__)
 
+# Import and register forum blueprint
+from api.forum_api import forum_bp
+app.register_blueprint(forum_bp)
+
 # Security: Restrict CORS to specific origins
 allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
 CORS(app, origins=allowed_origins, supports_credentials=True)

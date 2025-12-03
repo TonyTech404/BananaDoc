@@ -130,13 +130,14 @@ class GeminiHandler:
             try:
                 # Configure the API key
                 genai.configure(api_key=self.api_key)
-                # Initialize the model - try newer models first
+                # Initialize the model - prioritize free-tier models
                 model_names = [
-                    'models/gemini-2.5-flash',  # Latest flash model
-                    'models/gemini-2.0-flash',  # Alternative flash
-                    'models/gemini-2.5-pro',    # Pro model
-                    'gemini-pro',               # Legacy name
-                    'gemini-1.5-flash',         # Older version
+                    'models/gemini-2.0-flash-lite',  # Best for free tier (30 RPM, 1M TPM)
+                    'models/gemini-2.0-flash',       # Alternative flash
+                    'models/gemini-2.5-flash',       # Latest flash model
+                    'models/gemini-2.5-pro',         # Pro model
+                    'gemini-pro',                    # Legacy name
+                    'gemini-1.5-flash',              # Older version
                 ]
                 self.model = None
                 for model_name in model_names:

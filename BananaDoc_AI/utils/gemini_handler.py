@@ -128,8 +128,9 @@ class GeminiHandler:
             print("Warning: No Gemini API key provided. Set GEMINI_API_KEY environment variable.")
         elif GEMINI_AVAILABLE:
             try:
-                # Configure the API key
-                genai.configure(api_key=self.api_key)
+                # Configure the API key with REST transport for better timeout handling
+                # gRPC can cause 504 Deadline errors on longer prompts
+                genai.configure(api_key=self.api_key, transport='rest')
                 # Initialize the model - prioritize free-tier models
                 model_names = [
                     'models/gemini-2.0-flash-lite',  # Best for free tier (30 RPM, 1M TPM)
@@ -258,41 +259,113 @@ class GeminiHandler:
             # Build the full context prompt
             system_prompt = self.format_system_prompt()
             
+            # Detect language preference from query and add strong language instruction
+            language_instruction = ""
+            query_lower = user_query.lower()
+            if "tagalog" in query_lower or "filipino" in query_lower:
+                language_instruction = (
+                    "\n\n🚨 MAHALAGANG TAGUBILIN SA WIKA 🚨\n"
+                    "DAPAT kang sumagot ng BUONG TAGALOG/FILIPINO lamang.\n"
+                    "HUWAG gumamit ng mga salitang Ingles. Gumamit ng purong Tagalog/Filipino sa buong sagot.\n\n"
+                    "ISALIN ang LAHAT ng teknikal na termino:\n"
+                    "- 'calcium' → 'kaltsyum' o 'calcium (kaltsyum)'\n"
+                    "- 'nitrogen' → 'nitroheno'\n"
+                    "- 'potassium' → 'potasyum'\n"
+                    "- 'phosphorus' → 'posporus'\n"
+                    "- 'magnesium' → 'magnesyum'\n"
+                    "- 'deficiency' → 'kakulangan'\n"
+                    "- 'fertilizer' → 'pataba' o 'abono'\n"
+                    "- 'symptoms' → 'mga sintomas' o 'mga palatandaan'\n"
+                    "- 'treatment' → 'paggamot' o 'solusyon'\n"
+                    "- 'prevention' → 'pag-iwas'\n"
+                    "- 'apply' → 'ilagay' o 'maglagay'\n"
+                    "- 'soil' → 'lupa'\n"
+                    "- 'leaves' → 'mga dahon'\n"
+                    "- 'foliar spray' → 'pang-spray sa dahon'\n"
+                    "- 'product' → 'produkto'\n"
+                    "- 'available' → 'mabibili' o 'makukuha'\n\n"
+                    "Para sa mga pangalan ng produkto (Calcium Nitrate, etc.), isulat: 'Calcium Nitrate (Kaltsyum Nitrate)'\n"
+                    "MANDATORY: Sumagot ng 100% Tagalog/Filipino. Walang halong Ingles maliban sa mga brand name.\n"
+                )
+            elif "english" in query_lower:
+                language_instruction = (
+                    "\n\nLANGUAGE: Respond in clear, simple English that Filipino farmers can easily understand.\n"
+                )
+            
             # Format conversation history as text for context
             conversation_context = self._format_conversation_context()
             
             # Build the complete prompt with system context and conversation history
             if conversation_context:
-                full_prompt = f"{system_prompt}\n\n{conversation_context}\n\nUser's current question: {user_query}\n\nPlease provide a helpful, contextually-aware response based on the diagnosis information and conversation history above."
+                full_prompt = f"{system_prompt}{language_instruction}\n\n{conversation_context}\n\nUser's current question: {user_query}\n\nPlease provide a helpful, contextually-aware response based on the diagnosis information and conversation history above."
             else:
-                full_prompt = f"{system_prompt}\n\nUser's question: {user_query}\n\nPlease provide a helpful response based on the diagnosis information above."
+                full_prompt = f"{system_prompt}{language_instruction}\n\nUser's question: {user_query}\n\nPlease provide a helpful response based on the diagnosis information above."
             
             # Generate response using the model
             # Configure generation parameters for consistent, context-aware responses
-            # Increased max_output_tokens to allow for longer, more detailed responses
-            # Gemini 2.5-flash supports up to 8192 output tokens
-            # Using 8192 to allow for very detailed responses (cost estimates, treatments, etc.)
             generation_config = {
                 'temperature': 0.7,
                 'top_p': 0.9,
                 'top_k': 40,
-                'max_output_tokens': 8192,  # Increased from 1024 to 8192 (max for flash models) to prevent truncation
+                'max_output_tokens': 2048,  # Balanced for good responses without timeout
             }
             
-            response = self.model.generate_content(
-                full_prompt,
-                generation_config=generation_config
-            )
+            # Retry logic with exponential backoff for rate limiting and timeout errors
+            max_retries = 3
+            retry_delay = 3  # Initial delay in seconds
+            response = None
+            last_error = None
             
-            # Extract the text response - handle potential truncation
-            llm_response = response.text.strip()
+            for attempt in range(max_retries):
+                try:
+                    response = self.model.generate_content(
+                        full_prompt,
+                        generation_config=generation_config
+                    )
+                    break  # Success, exit retry loop
+                except Exception as retry_error:
+                    last_error = retry_error
+                    error_str = str(retry_error).lower()
+                    
+                    # Check for retryable errors (rate limit, timeout, connection issues)
+                    is_retryable = any(err in error_str for err in [
+                        "429", "resource exhausted", "toomanyrequests",
+                        "timeout", "timed out", "deadline",
+                        "connection", "unavailable", "503", "500"
+                    ])
+                    
+                    if is_retryable and attempt < max_retries - 1:
+                        wait_time = retry_delay * (2 ** attempt)  # Exponential backoff: 3s, 6s, 12s
+                        print(f"Retryable error. Waiting {wait_time}s before retry {attempt + 2}/{max_retries}...")
+                        time.sleep(wait_time)
+                    else:
+                        print(f"API error after {attempt + 1} attempts: {retry_error}")
+                        break  # Exit loop, will use fallback
+            
+            if response is None:
+                return self._fallback_response(user_query)
+            
+            # Extract the text response - handle multi-part responses
+            # response.text only works for simple single-part responses
+            llm_response = ""
+            try:
+                # Try the simple accessor first
+                llm_response = response.text.strip()
+            except ValueError:
+                # Handle multi-part responses by extracting text from all parts
+                if hasattr(response, 'candidates') and response.candidates:
+                    for candidate in response.candidates:
+                        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                            for part in candidate.content.parts:
+                                if hasattr(part, 'text'):
+                                    llm_response += part.text
+                    llm_response = llm_response.strip()
             
             # Check if response was truncated due to token limit
             if hasattr(response, 'candidates') and response.candidates:
                 finish_reason = response.candidates[0].finish_reason
                 if finish_reason == 'MAX_TOKENS':
                     print(f"Warning: Response may have been truncated due to max_output_tokens limit")
-                    # Could append a note, but for now just log it
                 elif finish_reason:
                     print(f"Response finish reason: {finish_reason}")
             
@@ -322,43 +395,80 @@ class GeminiHandler:
         Returns:
             A context-aware fallback response
         """
-        prediction = self.context_manager.current_prediction.get('data', {})
-        deficiency = prediction.get('deficiency', 'unknown')
+        # Try to extract deficiency info from the query context (sent by Flutter)
+        deficiency = 'unknown'
+        symptoms = ''
+        treatment = ''
+        prevention = ''
+        confidence = 0
         
         query_lower = user_query.lower()
         
-        # Provide context-aware responses based on keywords and available data
-        if "symptom" in query_lower or "sign" in query_lower or "look like" in query_lower:
-            symptoms = prediction.get('symptoms', 'not available')
-            return (
-                f"Based on the analysis, the {deficiency} deficiency symptoms include: {symptoms}. "
-                f"These symptoms typically appear on the leaves and can affect plant growth and fruit quality."
-            )
-        elif "treat" in query_lower or "fix" in query_lower or "remedy" in query_lower or "what should i do" in query_lower:
-            treatment = prediction.get('treatment', 'not available')
-            return (
-                f"For treating {deficiency} deficiency in your banana plants: {treatment}. "
-                f"It's important to follow the recommended application rates and timing for best results."
-            )
-        elif "prevent" in query_lower or "avoid" in query_lower or "future" in query_lower:
-            prevention = prediction.get('prevention', 'not available')
-            return (
-                f"To prevent {deficiency} deficiency: {prevention}. "
-                f"Regular soil testing and balanced fertilization are key to maintaining healthy banana plants."
-            )
-        elif deficiency != 'unknown':
+        # Extract deficiency type from query context
+        deficiency_types = ['calcium', 'nitrogen', 'potassium', 'phosphorus', 'magnesium', 'iron', 'zinc', 'boron']
+        for d_type in deficiency_types:
+            if f"deficiency: {d_type}" in query_lower or f"deficiency type: {d_type}" in query_lower:
+                deficiency = d_type.capitalize()
+                break
+        
+        # Extract symptoms from context
+        if "symptoms:" in query_lower:
+            try:
+                start = query_lower.index("symptoms:") + len("symptoms:")
+                end = query_lower.find("\n", start) if "\n" in query_lower[start:] else len(query_lower)
+                symptoms = user_query[start:start + (end - start)].strip()
+            except:
+                pass
+        
+        # Extract treatment from context
+        if "treatment:" in query_lower:
+            try:
+                start = query_lower.index("treatment:") + len("treatment:")
+                end = query_lower.find("\n", start) if "\n" in query_lower[start:] else len(query_lower)
+                treatment = user_query[start:start + (end - start)].strip()
+            except:
+                pass
+        
+        # Extract prevention from context
+        if "prevention:" in query_lower:
+            try:
+                start = query_lower.index("prevention:") + len("prevention:")
+                end = query_lower.find("\n", start) if "\n" in query_lower[start:] else len(query_lower)
+                prevention = user_query[start:start + (end - start)].strip()
+            except:
+                pass
+        
+        # Also check stored prediction if query extraction failed
+        prediction = self.context_manager.current_prediction.get('data', {})
+        if deficiency == 'unknown' and prediction:
+            deficiency = prediction.get('deficiency', 'unknown')
+            symptoms = symptoms or prediction.get('symptoms', '')
+            treatment = treatment or prediction.get('treatment', '')
+            prevention = prevention or prediction.get('prevention', '')
             confidence = prediction.get('confidence', 0) * 100
-            return (
-                f"The analysis indicates a {deficiency} deficiency in your banana plant "
-                f"(confidence: {confidence:.1f}%). "
-                f"I can help you understand the symptoms, treatment options, and prevention measures. "
-                f"What specific information would you like to know?"
-            )
+        
+        # Provide helpful responses based on deficiency type
+        if deficiency != 'unknown':
+            # Return context-aware response with available info
+            response_parts = [f"For {deficiency} deficiency in your banana plants:\n"]
+            
+            if treatment:
+                response_parts.append(f"**Treatment:** {treatment}\n")
+            
+            if symptoms:
+                response_parts.append(f"**Symptoms:** {symptoms}\n")
+            
+            if prevention:
+                response_parts.append(f"**Prevention:** {prevention}\n")
+            
+            response_parts.append("\nNote: The AI service is temporarily busy. Please try again in a moment for more detailed recommendations.")
+            
+            return "".join(response_parts)
         else:
             return (
                 "I'm here to help with banana plant nutrition questions. "
-                "Please upload a leaf image for analysis, or ask me about common nutrient deficiencies, "
-                "treatment methods, or prevention strategies."
+                "The AI service is temporarily busy - please try again in a moment. "
+                "You can also ask about specific deficiencies like Calcium, Nitrogen, Potassium, etc."
             )
     
     def _format_conversation_context(self) -> str:

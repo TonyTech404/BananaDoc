@@ -8,12 +8,14 @@ class FarmerLanguageSelector extends StatelessWidget {
   final bool showAsPopup;
   final Color? backgroundColor;
   final Color? textColor;
+  final Function(String languageCode)? onLanguageChanged;
 
   const FarmerLanguageSelector({
     super.key,
     this.showAsPopup = true,
     this.backgroundColor,
     this.textColor,
+    this.onLanguageChanged,
   });
 
   @override
@@ -68,7 +70,8 @@ class FarmerLanguageSelector extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              _getCurrentLanguageName(context, localeProvider.locale.languageCode),
+              _getCurrentLanguageName(
+                  context, localeProvider.locale.languageCode),
               style: TextStyle(
                 color: textColor ?? Colors.white,
                 fontWeight: FontWeight.w500,
@@ -212,21 +215,19 @@ class FarmerLanguageSelector extends StatelessWidget {
     bool isSelected,
   ) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTap: () => _changeLanguage(context, languageCode),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected 
+          color: isSelected
               ? theme.colorScheme.primary.withValues(alpha: 0.1)
               : Colors.grey[50],
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected 
-                ? theme.colorScheme.primary
-                : Colors.grey[300]!,
+            color: isSelected ? theme.colorScheme.primary : Colors.grey[300]!,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -242,9 +243,7 @@ class FarmerLanguageSelector extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
-                color: isSelected 
-                    ? theme.colorScheme.primary
-                    : Colors.black87,
+                color: isSelected ? theme.colorScheme.primary : Colors.black87,
               ),
             ),
             Text(
@@ -288,14 +287,18 @@ class FarmerLanguageSelector extends StatelessWidget {
     }
   }
 
-  Future<void> _changeLanguage(BuildContext context, String languageCode) async {
+  Future<void> _changeLanguage(
+      BuildContext context, String languageCode) async {
     final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
-    
+
     // Update the locale
     localeProvider.setLocale(Locale(languageCode, ''));
-    
+
     // Save the preference
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selected_language', languageCode);
+
+    // Call the callback if provided
+    onLanguageChanged?.call(languageCode);
   }
 }

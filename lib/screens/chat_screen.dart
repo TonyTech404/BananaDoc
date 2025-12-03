@@ -4,9 +4,8 @@ import 'package:provider/provider.dart';
 import '../services/llm_service.dart';
 import '../models/leaf_analysis_result.dart';
 import '../services/offline_deficiency_service.dart';
-import '../localization/app_localizations.dart';
 import '../providers/locale_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/farmer_language_selector.dart';
 
 class ChatMessage {
   final String text;
@@ -302,7 +301,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
     final localeProvider = Provider.of<LocaleProvider>(context);
 
     // Update LLM service locale
@@ -322,65 +320,22 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'en') {
-                localeProvider.setLocale(const Locale('en', ''));
-                // Update language preference
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('selected_language', 'en');
-                // Update LLM service locale
-                _llmService.currentLocale = const Locale('en', '');
+          FarmerLanguageSelector(
+            backgroundColor: Colors.white.withValues(alpha: 0.12),
+            textColor: Colors.white,
+            onLanguageChanged: (languageCode) {
+              // Update LLM service locale
+              _llmService.currentLocale = Locale(languageCode, '');
 
-                // Reset conversation and start over in English
-                setState(() {
-                  _messages.clear();
-                  _conversationHistory = "";
-                });
-                _addInitialMessages();
-              } else if (value == 'tl') {
-                localeProvider.setLocale(const Locale('tl', ''));
-                // Update language preference
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('selected_language', 'tl');
-                // Update LLM service locale
-                _llmService.currentLocale = const Locale('tl', '');
-
-                // Reset conversation and start over in Filipino
-                setState(() {
-                  _messages.clear();
-                  _conversationHistory = "";
-                });
-                _addInitialMessages();
-              }
+              // Reset conversation and start over in new language
+              setState(() {
+                _messages.clear();
+                _conversationHistory = "";
+              });
+              _addInitialMessages();
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'en',
-                child: Row(
-                  children: [
-                    if (localeProvider.locale.languageCode == 'en')
-                      const Icon(Icons.check, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Text(localizations.english),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'tl',
-                child: Row(
-                  children: [
-                    if (localeProvider.locale.languageCode == 'tl')
-                      const Icon(Icons.check, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Text(localizations.filipino),
-                  ],
-                ),
-              ),
-            ],
-            icon: const Icon(Icons.language),
-            tooltip: localizations.selectLanguage,
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(

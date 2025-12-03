@@ -155,7 +155,7 @@ class LLMService {
       debugPrint('Calling backend chat API at: $chatEndpoint');
       debugPrint('Query length: ${fullQuery.length}');
 
-      // Make API request
+      // Make API request with longer timeout for Gemini API calls
       final response = await http
           .post(
             Uri.parse(chatEndpoint),
@@ -164,7 +164,7 @@ class LLMService {
               'query': fullQuery,
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 90));
 
       debugPrint('Backend API response status: ${response.statusCode}');
 

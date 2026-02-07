@@ -10,26 +10,26 @@ echo "Working directory: $(pwd)"
 mkdir -p assets/models
 echo "Created assets/models directory"
 
-# Check if the mobile model exists
-MOBILE_MODEL="BananaDoc_AI/model/banana_mobile_model.tflite"
-METADATA="BananaDoc_AI/model/banana_mobile_model_metadata.txt"
-CLASS_MAPPING="BananaDoc_AI/model/mobile_class_mapping.txt"
+# Check if the mobile model exists (updated for new structure)
+MOBILE_MODEL="../backend/models_runtime/banana_mobile_model.tflite"
+METADATA="../backend/models_runtime/banana_mobile_model_metadata.txt"
+CLASS_MAPPING="../backend/models_runtime/mobile_class_mapping.txt"
 
 if [ ! -f "$MOBILE_MODEL" ]; then
     echo "Mobile model not found at $MOBILE_MODEL"
     echo "Creating the mobile model first..."
     
     # Check if create_mobile_model.sh exists and is executable
-    if [ -f "BananaDoc_AI/model/create_mobile_model.sh" ] && [ -x "BananaDoc_AI/model/create_mobile_model.sh" ]; then
+    if [ -f "../backend/training/create_mobile_model.sh" ] && [ -x "../backend/training/create_mobile_model.sh" ]; then
         # Execute the script to create the mobile model
         echo "Running create_mobile_model.sh..."
-        cd BananaDoc_AI/model
+        cd ../backend/training
         ./create_mobile_model.sh
-        cd ../..
+        cd ../../mobile
     else
         echo "Error: create_mobile_model.sh not found or not executable."
         echo "Please create the mobile model first by running:"
-        echo "cd BananaDoc_AI/model && chmod +x create_mobile_model.sh && ./create_mobile_model.sh"
+        echo "cd backend/training && chmod +x create_mobile_model.sh && ./create_mobile_model.sh"
         exit 1
     fi
 fi

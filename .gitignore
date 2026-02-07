@@ -39,6 +39,10 @@ config.js
 .pub-cache/
 .pub/
 /build/
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
 
 # Symbolication related
 app.*.symbols
@@ -67,6 +71,8 @@ venv/
 env/
 ENV/
 .venv
+backend/venv/
+backend/env/
 
 # Large model files (>100MB should use Git LFS)
 *.keras
@@ -78,9 +84,10 @@ ENV/
 **/model/*.h5
 **/models/*.keras
 **/models/*.h5
-BananaDoc_AI/model/simple_banana_model.keras
-BananaDoc_AI/model/banana_nutrient_model.keras
-BananaDoc_AI/model/banana_nutrient_model.h5
+backend/models_runtime/*.keras
+backend/models_runtime/*.h5
+backend/training/*.keras
+backend/training/*.h5
 
 # Build artifacts
 **/build/
@@ -97,7 +104,9 @@ Images of Nutrient Deficient Banana Plant Leaves/
 **/Images of Nutrient Deficient Banana Plant Leaves/
 
 # Training scripts and artifacts (development only)
-BananaDoc_AI/training/*.png
+backend/training/*.png
+backend/training/output/
+backend/training/logs/
 BananaDoc_AI/training/finetuned_mobile_model.keras
 
 # Runtime models (these are tracked in git)

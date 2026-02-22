@@ -201,8 +201,8 @@ For issues and questions:
 
 ## 👥 Team
 
-Developed by [Your Team Name]
+Developed by **TEAMBA - CS3**
 
 ---
 
-**Last Updated:** February 7, 2026
+**Last Updated:** February 22, 2026
